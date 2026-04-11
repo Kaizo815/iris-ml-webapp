@@ -100,7 +100,7 @@ def get_train_test_data(df):
     return X_train, X_test, y_train, y_test
 
 # =========================
-# 3. 可视化函数 (融入莫兰迪与学术风格)
+# 3. 可视化与描述生成函数
 # =========================
 def plot_pca_3d(df):
     """交互式 3D PCA 降维可视化"""
@@ -162,7 +162,6 @@ def plot_heatmap(df):
     corr_matrix = numeric_df.corr()
 
     fig, ax = plt.subplots(figsize=(7, 5))
-    # 使用 vlag 形成冷暖低饱和对比
     sns.heatmap(
         corr_matrix,
         annot=True,
@@ -180,7 +179,6 @@ def plot_heatmap(df):
 
 def plot_confusion_matrix(cm, labels, title):
     fig, ax = plt.subplots(figsize=(5.5, 4.5))
-    # 使用更浅的灰色/蓝色调
     sns.heatmap(
         cm,
         annot=True,
@@ -192,7 +190,7 @@ def plot_confusion_matrix(cm, labels, title):
         linewidths=1,
         linecolor='white',
         ax=ax,
-        annot_kws={"size": 12, "color": "#333333"}
+        annot_kws={"size": 12}
     )
     ax.set_title(title, fontweight="bold", pad=15)
     ax.set_xlabel("Predicted Label")
@@ -261,7 +259,6 @@ def plot_compare_bar(compare_df):
     ax.set_ylabel("Test Set Accuracy")
     ax.set_ylim(0, 1.1)
     
-    # 隐藏 y 轴，让图表更清爽，数据直接写在柱子上
     ax.get_yaxis().set_visible(False)
     ax.spines['left'].set_visible(False)
     
@@ -271,12 +268,30 @@ def plot_compare_bar(compare_df):
     plt.tight_layout()
     return fig
 
-# =========================
-# 4. 模型函数 (保留原逻辑)
-# =========================
-# (此处省略了 run_knn, run_svm, run_random_forest, run_xgboost 的重写，因为逻辑完全一致，仅在画图处调用了新的样式)
-# 为保证代码完整直接运行，这里原样保留：
+# 生成动态客观结果描述
+def get_objective_cm_text(cm, labels):
+    total = np.sum(cm)
+    correct = np.trace(cm)
+    misclassified = total - correct
+    
+    desc = f"📊 **测试集分类结果客观统计**：共计测试 **{total}** 个样本，当前模型正确预测了 **{correct}** 个。\n\n"
+    
+    if misclassified == 0:
+        desc += f"当前参数下，模型对测试集的分类准确率达到了 100%，无误判样本。"
+    else:
+        desc += f"存在 **{misclassified}** 个误判样本。具体错误分布如下："
+        errors = []
+        for i in range(len(labels)):
+            for j in range(len(labels)):
+                if i != j and cm[i, j] > 0:
+                    errors.append(f"将真实类别为 **{labels[i]}** 的样本错误预测为了 **{labels[j]}**（共 {cm[i, j]} 例）")
+        desc += "；".join(errors) + "。"
+        
+    return desc
 
+# =========================
+# 4. 模型函数
+# =========================
 def run_knn(df, k=5):
     X_train, X_test, y_train, y_test = get_train_test_data(df)
     scaler = StandardScaler()
@@ -298,7 +313,8 @@ def run_knn(df, k=5):
     cm = confusion_matrix(y_test, y_pred, labels=SPECIES_ORDER)
     return {"accuracy": acc, "report_df": report_df, 
             "cm_fig": plot_confusion_matrix(cm, SPECIES_ORDER, f"Confusion Matrix (k={k})"),
-            "curve_fig": plot_knn_curve(k_values, train_accs, test_accs, k_values[int(np.argmax(test_accs))])}
+            "curve_fig": plot_knn_curve(k_values, train_accs, test_accs, k_values[int(np.argmax(test_accs))]),
+            "cm": cm, "labels": SPECIES_ORDER}
 
 def run_svm(df, c_value=1.0):
     X_train, X_test, y_train, y_test = get_train_test_data(df)
@@ -321,7 +337,8 @@ def run_svm(df, c_value=1.0):
     cm = confusion_matrix(y_test, y_pred, labels=SPECIES_ORDER)
     return {"accuracy": acc, "report_df": report_df, 
             "cm_fig": plot_confusion_matrix(cm, SPECIES_ORDER, f"Confusion Matrix (C={c_value})"),
-            "curve_fig": plot_svm_curve(C_values, train_accs, test_accs, C_values[int(np.argmax(test_accs))])}
+            "curve_fig": plot_svm_curve(C_values, train_accs, test_accs, C_values[int(np.argmax(test_accs))]),
+            "cm": cm, "labels": SPECIES_ORDER}
 
 def run_random_forest(df, n_estimators=200):
     X_train, X_test, y_train, y_test = get_train_test_data(df)
@@ -335,7 +352,8 @@ def run_random_forest(df, n_estimators=200):
     return {"accuracy": acc, "report_df": report_df, 
             "cm_fig": plot_confusion_matrix(cm, SPECIES_ORDER, f"Confusion Matrix (Trees={n_estimators})"),
             "importance_fig": plot_feature_importance(importance_df, "Feature Importance (RF)"),
-            "importance_df": importance_df}
+            "importance_df": importance_df,
+            "cm": cm, "labels": SPECIES_ORDER}
 
 def run_xgboost(df, n_estimators=100, max_depth=3, learning_rate=0.1):
     try:
@@ -357,7 +375,8 @@ def run_xgboost(df, n_estimators=100, max_depth=3, learning_rate=0.1):
     return {"accuracy": acc, "report_df": report_df, 
             "cm_fig": plot_confusion_matrix(cm, label_encoder.classes_, "Confusion Matrix (XGBoost)"),
             "importance_fig": plot_feature_importance(importance_df, "Feature Importance (XGBoost)"),
-            "importance_df": importance_df}
+            "importance_df": importance_df,
+            "cm": cm, "labels": label_encoder.classes_}
 
 @st.cache_data
 def compare_models(df):
@@ -420,7 +439,6 @@ with tab1:
 
 with tab2:
     st.subheader("Interactive 3D Dimensionality Reduction (PCA)")
-    # 插入 Plotly 3D 可视化
     st.plotly_chart(plot_pca_3d(df), use_container_width=True)
     st.info("💡 降维分析：主成分分析（PCA）将 4 维特征映射至 3 维空间。可以看出，Setosa 形成了完全独立的聚簇，而 Versicolour 与 Virginica 的决策边界更为贴近。")
     
@@ -430,8 +448,10 @@ with tab2:
     col1, col2 = st.columns(2)
     with col1:
         st.pyplot(plot_scatter(df), use_container_width=True)
+        st.success("📊 图表解析：从散点分布可知，Setosa 在花瓣尺寸上明显偏小，与其他两类形成严格的**线性可分**边界；而 Versicolour 和 Virginica 在边界处存在轻微的特征重叠，这往往是大多数分类算法发生误判的主要区域。")
     with col2:
         st.pyplot(plot_heatmap(df), use_container_width=True)
+        st.success("📊 图表解析：热力图展示了特征间的皮尔逊相关系数（Pearson Correlation）。花瓣长度、花瓣宽度呈现极强的正相关（r > 0.9），表明存在较高的**特征冗余**。这意味着在工程实践中，仅凭借花瓣特征即可提供大部分分类信息。")
 
 with tab3:
     st.subheader("Accuracy Comparison Baseline")
@@ -460,6 +480,7 @@ with tab4:
             st.pyplot(result["curve_fig"], use_container_width=True)
         with col2:
             st.pyplot(result["cm_fig"], use_container_width=True)
+            st.info(get_objective_cm_text(result["cm"], result["labels"]))
         st.subheader("Classification Report")
         st.dataframe(result["report_df"], use_container_width=True)
 
@@ -474,6 +495,7 @@ with tab4:
             st.pyplot(result["curve_fig"], use_container_width=True)
         with col2:
             st.pyplot(result["cm_fig"], use_container_width=True)
+            st.info(get_objective_cm_text(result["cm"], result["labels"]))
         st.subheader("Classification Report")
         st.dataframe(result["report_df"], use_container_width=True)
 
@@ -486,6 +508,7 @@ with tab4:
         col1, col2 = st.columns(2)
         with col1:
             st.pyplot(result["cm_fig"], use_container_width=True)
+            st.info(get_objective_cm_text(result["cm"], result["labels"]))
         with col2:
             st.pyplot(result["importance_fig"], use_container_width=True)
         st.subheader("Classification Report")
@@ -506,6 +529,7 @@ with tab4:
             col1, col2 = st.columns(2)
             with col1:
                 st.pyplot(result["cm_fig"], use_container_width=True)
+                st.info(get_objective_cm_text(result["cm"], result["labels"]))
             with col2:
                 st.pyplot(result["importance_fig"], use_container_width=True)
             st.subheader("Classification Report")
