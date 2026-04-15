@@ -129,7 +129,7 @@ def get_train_test_data(iris_data):
 # =========================
 def plot_violin(iris_data):
     # 放大到你当前版本的大约 1.5 倍左右
-    fig, axes = plt.subplots(2, 2, figsize=(11.2, 8.1))
+    fig, axes = plt.subplots(2, 2, figsize=(7.8, 5.7))
     fig.suptitle(
         "Feature Distribution Analysis",
         fontsize=13,
