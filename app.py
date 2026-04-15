@@ -382,7 +382,7 @@ def plot_multi_metrics_heatmap(iris_data):
     metrics_df = pd.DataFrame(results).T
 
     # 放大到当前版本的接近 2 倍
-    fig, ax = plt.subplots(figsize=(10.6, 6.4))
+    fig, ax = plt.subplots(figsize=(7.8, 5.7))
     sns.heatmap(
         metrics_df,
         annot=True,
@@ -459,7 +459,7 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
     cmap_light = ListedColormap(["#FFD1CF", "#D4F0FA", "#D4FADD"])
 
     # 放大到当前版本的接近 2 倍
-    fig, ax = plt.subplots(figsize=(13, 8.1))
+    fig, ax = plt.subplots(figsize=(9.1, 5.7))
     ax.contourf(xx, yy, Z, cmap=cmap_light, alpha=0.6)
 
     sns.scatterplot(
