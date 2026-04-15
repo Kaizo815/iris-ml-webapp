@@ -128,7 +128,7 @@ def get_train_test_data(iris_data):
 # 3. 图表函数
 # =========================
 def plot_violin(iris_data):
-    fig, axes = plt.subplots(2, 2, figsize=(4.2, 3.0))
+    fig, axes = plt.subplots(2, 2, figsize=(6.3, 4.5))
     fig.suptitle(
         "Feature Distribution Analysis",
         fontsize=8.5,
