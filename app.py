@@ -128,7 +128,7 @@ def get_train_test_data(iris_data):
 # 3. 图表函数
 # =========================
 def plot_violin(iris_data):
-    fig, axes = plt.subplots(2, 2, figsize=(6.3, 4.5))
+    fig, axes = plt.subplots(2, 2, figsize=(7.5, 5.4))
     fig.suptitle(
         "Feature Distribution Analysis",
         fontsize=8.5,
@@ -187,7 +187,7 @@ def plot_scatter(iris_data):
 def plot_heatmap(iris_data):
     corr_matrix = iris_data[FEATURE_COLS].corr()
 
-    fig, ax = plt.subplots(figsize=(4.7, 3.5))
+    fig, ax = plt.subplots(figsize=(9.4, 7))
     sns.heatmap(
         corr_matrix,
         annot=True,
@@ -456,7 +456,7 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
 
     cmap_light = ListedColormap(["#FFD1CF", "#D4F0FA", "#D4FADD"])
 
-    fig, ax = plt.subplots(figsize=(4.6, 2.9))
+    fig, ax = plt.subplots(figsize=(9.2, 5.8))
     ax.contourf(xx, yy, Z, cmap=cmap_light, alpha=0.6)
 
     sns.scatterplot(
