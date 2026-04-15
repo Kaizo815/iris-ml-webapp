@@ -108,8 +108,8 @@ def get_train_test_data(iris_data):
 # 3. 基础可视化函数
 # =========================
 def plot_violin(iris_data):
-    fig, axes = plt.subplots(2, 2, figsize=(8.2, 5.6))
-    fig.suptitle("Feature Distribution Analysis (Violin Plots)", fontsize=14, fontweight="bold", y=1.02)
+    fig, axes = plt.subplots(2, 2, figsize=(5.2, 3.8))
+    fig.suptitle("Feature Distribution Analysis (Violin Plots)", fontsize=10.5, fontweight="bold", y=1.01)
 
     for i, col in enumerate(FEATURE_COLS):
         ax = axes[i // 2, i % 2]
@@ -119,18 +119,17 @@ def plot_violin(iris_data):
             y=col,
             palette=MORANDI_PALETTE,
             inner="quartile",
-            linewidth=1.1,
+            linewidth=0.9,
             ax=ax
         )
-        ax.set_title(f"Distribution of {col}", fontweight="bold", pad=8, fontsize=11)
+        ax.set_title(f"{col}", fontweight="bold", pad=4, fontsize=8.5)
         ax.set_xlabel("")
-        ax.set_ylabel("Centimeters (cm)")
-        ax.tick_params(axis="x", labelsize=9)
-        ax.tick_params(axis="y", labelsize=9)
+        ax.set_ylabel("cm", fontsize=8)
+        ax.tick_params(axis="x", labelsize=7, rotation=15)
+        ax.tick_params(axis="y", labelsize=7)
 
-    plt.tight_layout(pad=0.8)
+    plt.tight_layout(pad=0.4)
     return fig
-
 
 def plot_scatter(iris_data):
     fig, ax = plt.subplots(figsize=(6.2, 4.2))
