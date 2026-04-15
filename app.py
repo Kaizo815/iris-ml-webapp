@@ -33,6 +33,26 @@ st.set_page_config(
     layout="wide"
 )
 
+# 页面宽度与间距优化
+st.markdown("""
+<style>
+.block-container {
+    max-width: 1100px;
+    padding-top: 1.2rem;
+    padding-bottom: 1.2rem;
+}
+div[data-testid="stMetric"] {
+    background: #fafafa;
+    border: 1px solid #eeeeee;
+    border-radius: 12px;
+    padding: 10px 14px;
+}
+div[data-testid="stDataFrame"] {
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # =========================
 # 1. 全局绘图风格与配色
 # =========================
@@ -105,14 +125,13 @@ def get_train_test_data(iris_data):
 
 
 # =========================
-# 3. 基础可视化函数
+# 3. 图表函数
 # =========================
 def plot_violin(iris_data):
-    # 明显缩小：原来很大，这里直接压到更紧凑
-    fig, axes = plt.subplots(2, 2, figsize=(4.8, 3.4))
+    fig, axes = plt.subplots(2, 2, figsize=(4.2, 3.0))
     fig.suptitle(
-        "Feature Distribution Analysis (Violin Plots)",
-        fontsize=9.5,
+        "Feature Distribution Analysis",
+        fontsize=8.5,
         fontweight="bold",
         y=1.01
     )
@@ -125,51 +144,50 @@ def plot_violin(iris_data):
             y=col,
             palette=MORANDI_PALETTE,
             inner="quartile",
-            linewidth=0.8,
+            linewidth=0.7,
             cut=0,
             ax=ax
         )
-        ax.set_title(col, fontweight="bold", pad=3, fontsize=7.8)
+        ax.set_title(col, fontweight="bold", pad=2, fontsize=6.8)
         ax.set_xlabel("")
-        ax.set_ylabel("cm", fontsize=7.2)
-        ax.tick_params(axis="x", labelsize=6.2, rotation=15)
-        ax.tick_params(axis="y", labelsize=6.2)
+        ax.set_ylabel("cm", fontsize=6.2)
+        ax.tick_params(axis="x", labelsize=5.5, rotation=15)
+        ax.tick_params(axis="y", labelsize=5.5)
 
-    plt.tight_layout(pad=0.25)
+    plt.tight_layout(pad=0.2)
     return fig
 
 
 def plot_scatter(iris_data):
-    fig, ax = plt.subplots(figsize=(5.4, 3.6))
+    fig, ax = plt.subplots(figsize=(4.8, 3.3))
     sns.scatterplot(
         data=iris_data,
         x="petallength",
         y="petalwidth",
         hue="species",
         hue_order=SPECIES_ORDER,
-        s=48,
+        s=34,
         palette=MORANDI_PALETTE,
         edgecolor="black",
         alpha=0.8,
         ax=ax
     )
 
-    ax.set_title("Basic View: 2D Scatter Distribution", fontweight="bold", pad=8, fontsize=10.5)
-    ax.set_xlabel("Petal Length", fontsize=8.5)
-    ax.set_ylabel("Petal Width", fontsize=8.5)
-    ax.tick_params(axis="x", labelsize=7)
-    ax.tick_params(axis="y", labelsize=7)
-    ax.legend(title="Species", loc="upper left", frameon=False, fontsize=7, title_fontsize=8)
+    ax.set_title("2D Scatter Distribution", fontweight="bold", pad=6, fontsize=9.5)
+    ax.set_xlabel("Petal Length", fontsize=7.5)
+    ax.set_ylabel("Petal Width", fontsize=7.5)
+    ax.tick_params(axis="x", labelsize=6.5)
+    ax.tick_params(axis="y", labelsize=6.5)
+    ax.legend(title="Species", loc="upper left", frameon=False, fontsize=6.5, title_fontsize=7)
 
-    plt.tight_layout(pad=0.35)
+    plt.tight_layout(pad=0.25)
     return fig
 
 
 def plot_heatmap(iris_data):
-    numeric_df = iris_data[FEATURE_COLS]
-    corr_matrix = numeric_df.corr()
+    corr_matrix = iris_data[FEATURE_COLS].corr()
 
-    fig, ax = plt.subplots(figsize=(5.2, 3.8))
+    fig, ax = plt.subplots(figsize=(4.7, 3.5))
     sns.heatmap(
         corr_matrix,
         annot=True,
@@ -178,25 +196,25 @@ def plot_heatmap(iris_data):
         vmin=0,
         vmax=1,
         square=True,
-        linewidths=0.5,
+        linewidths=0.45,
         cbar=True,
         ax=ax,
-        annot_kws={"size": 8, "color": "#222222"}
+        annot_kws={"size": 7, "color": "#222222"}
     )
 
-    ax.set_title("Advanced Analysis: Feature Correlation Heatmap", fontweight="bold", pad=8, fontsize=10.5)
+    ax.set_title("Feature Correlation Heatmap", fontweight="bold", pad=6, fontsize=9.5)
     ax.set_xlabel("")
     ax.set_ylabel("")
 
     for label in ax.get_xticklabels():
         label.set_rotation(30)
         label.set_ha("right")
-        label.set_fontsize(7)
+        label.set_fontsize(6.2)
 
     for label in ax.get_yticklabels():
-        label.set_fontsize(7)
+        label.set_fontsize(6.2)
 
-    plt.tight_layout(pad=0.35)
+    plt.tight_layout(pad=0.25)
     return fig
 
 
@@ -227,24 +245,24 @@ def plot_pca_3d(iris_data):
         opacity=0.88
     )
 
-    fig.update_traces(marker=dict(size=2.6))
+    fig.update_traces(marker=dict(size=2.4))
 
     fig.update_layout(
         template="simple_white",
-        height=300,
+        height=280,
+        font=dict(family="Times New Roman", size=9, color="#333333"),
+        margin=dict(l=0, r=0, b=0, t=30),
         scene=dict(
             xaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#E5E5E5", showbackground=False),
             yaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#E5E5E5", showbackground=False),
             zaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#E5E5E5", showbackground=False),
-        ),
-        font=dict(family="Times New Roman", size=10, color="#333333"),
-        margin=dict(l=0, r=0, b=0, t=34)
+        )
     )
     return fig
 
 
 def plot_confusion_matrix(cm, labels, title):
-    fig, ax = plt.subplots(figsize=(4.1, 3.3))
+    fig, ax = plt.subplots(figsize=(3.7, 3.0))
     sns.heatmap(
         cm,
         annot=True,
@@ -253,30 +271,27 @@ def plot_confusion_matrix(cm, labels, title):
         cbar=True,
         xticklabels=labels,
         yticklabels=labels,
-        linewidths=0.45,
+        linewidths=0.4,
         ax=ax,
-        annot_kws={"size": 9.5, "color": "#222222"}
+        annot_kws={"size": 8, "color": "#222222"}
     )
 
-    ax.set_title(title, fontweight="bold", pad=7, fontsize=9.5)
-    ax.set_xlabel("Predicted Label", fontsize=7.8)
-    ax.set_ylabel("True Label", fontsize=7.8)
+    ax.set_title(title, fontweight="bold", pad=5, fontsize=8.5)
+    ax.set_xlabel("Predicted Label", fontsize=6.7)
+    ax.set_ylabel("True Label", fontsize=6.7)
 
     for label in ax.get_xticklabels():
         label.set_rotation(0)
-        label.set_fontsize(6.5)
+        label.set_fontsize(5.8)
 
     for label in ax.get_yticklabels():
         label.set_rotation(0)
-        label.set_fontsize(6.5)
+        label.set_fontsize(5.8)
 
-    plt.tight_layout(pad=0.3)
+    plt.tight_layout(pad=0.2)
     return fig
 
 
-# =========================
-# 4. 新增高级图函数
-# =========================
 def plot_multi_metrics_heatmap(iris_data):
     X = iris_data[FEATURE_COLS]
     y = iris_data["species"]
@@ -365,25 +380,25 @@ def plot_multi_metrics_heatmap(iris_data):
 
     metrics_df = pd.DataFrame(results).T
 
-    fig, ax = plt.subplots(figsize=(6.0, 3.6))
+    fig, ax = plt.subplots(figsize=(5.3, 3.2))
     sns.heatmap(
         metrics_df,
         annot=True,
         fmt=".4f",
         cmap="PuBu",
-        linewidths=0.8,
+        linewidths=0.7,
         linecolor="white",
         cbar=True,
         ax=ax,
-        annot_kws={"size": 8.5, "fontweight": "bold"}
+        annot_kws={"size": 7.5, "fontweight": "bold"}
     )
 
-    ax.set_title("Multi-Metric Model Comparison", fontsize=10.5, fontweight="bold", pad=8)
+    ax.set_title("Multi-Metric Model Comparison", fontsize=9.5, fontweight="bold", pad=6)
     ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
-    ax.tick_params(axis="x", labelsize=7)
-    ax.tick_params(axis="y", labelsize=7)
+    ax.tick_params(axis="x", labelsize=6.3)
+    ax.tick_params(axis="y", labelsize=6.3)
 
-    plt.tight_layout(pad=0.35)
+    plt.tight_layout(pad=0.25)
     return fig
 
 
@@ -441,7 +456,7 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
 
     cmap_light = ListedColormap(["#FFD1CF", "#D4F0FA", "#D4FADD"])
 
-    fig, ax = plt.subplots(figsize=(5.0, 3.1))
+    fig, ax = plt.subplots(figsize=(4.6, 2.9))
     ax.contourf(xx, yy, Z, cmap=cmap_light, alpha=0.6)
 
     sns.scatterplot(
@@ -450,24 +465,24 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
         hue=plot_df["species"],
         palette=MORANDI_PALETTE,
         edgecolor="#555555",
-        s=20,
+        s=16,
         alpha=0.9,
         ax=ax
     )
 
-    ax.set_title(title, fontweight="bold", pad=5, fontsize=9)
-    ax.set_xlabel("Petal Length (cm)", fontsize=7)
-    ax.set_ylabel("Petal Width (cm)", fontsize=7)
-    ax.tick_params(axis="x", labelsize=6)
-    ax.tick_params(axis="y", labelsize=6)
-    ax.legend(title="True Species", loc="upper left", frameon=False, fontsize=6, title_fontsize=7)
+    ax.set_title(title, fontweight="bold", pad=4, fontsize=8.2)
+    ax.set_xlabel("Petal Length (cm)", fontsize=6.2)
+    ax.set_ylabel("Petal Width (cm)", fontsize=6.2)
+    ax.tick_params(axis="x", labelsize=5.5)
+    ax.tick_params(axis="y", labelsize=5.5)
+    ax.legend(title="True Species", loc="upper left", frameon=False, fontsize=5.5, title_fontsize=6.2)
 
-    plt.tight_layout(pad=0.25)
+    plt.tight_layout(pad=0.18)
     return fig
 
 
 # =========================
-# 5. 模型函数
+# 4. 模型函数
 # =========================
 def run_knn(iris_data, k=5):
     X_train, X_test, y_train, y_test = get_train_test_data(iris_data)
@@ -481,9 +496,7 @@ def run_knn(iris_data, k=5):
     y_pred = model.predict(X_test_std)
 
     acc = accuracy_score(y_test, y_pred)
-    report_df = pd.DataFrame(
-        classification_report(y_test, y_pred, output_dict=True)
-    ).transpose()
+    report_df = pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose()
     cm = confusion_matrix(y_test, y_pred, labels=SPECIES_ORDER)
 
     return {
@@ -507,9 +520,7 @@ def run_svm(iris_data, c_value=1.0):
     y_pred = model.predict(X_test_std)
 
     acc = accuracy_score(y_test, y_pred)
-    report_df = pd.DataFrame(
-        classification_report(y_test, y_pred, output_dict=True)
-    ).transpose()
+    report_df = pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose()
     cm = confusion_matrix(y_test, y_pred, labels=SPECIES_ORDER)
 
     return {
@@ -541,9 +552,7 @@ def run_random_forest(iris_data, n_estimators=200):
     y_pred = model.predict(X_test)
 
     acc = accuracy_score(y_test, y_pred)
-    report_df = pd.DataFrame(
-        classification_report(y_test, y_pred, output_dict=True)
-    ).transpose()
+    report_df = pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose()
     cm = confusion_matrix(y_test, y_pred, labels=SPECIES_ORDER)
 
     return {
@@ -668,11 +677,16 @@ with tab1:
     col3.metric("类别数", summary["classes"])
 
     st.subheader("2. 四特征分布小提琴图")
-    st.pyplot(plot_violin(iris_data))
-    st.success("📊 图表解析：小提琴图展示了四个特征在三类样本中的分布形态。可以直观看出，花瓣长度与花瓣宽度的类别区分度明显高于花萼特征，因此它们通常提供更强的分类信息。")
+    left, right = st.columns([0.95, 1.05])
+
+    with left:
+        st.pyplot(plot_violin(iris_data), use_container_width=False)
+
+    with right:
+        st.success("📊 图表解析：小提琴图展示了四个特征在三类样本中的分布形态。可以直观看出，花瓣长度与花瓣宽度的类别区分度明显高于花萼特征，因此它们通常提供更强的分类信息。")
 
     st.subheader("3. 原始数据预览")
-    st.dataframe(iris_data, use_container_width=True, height=300)
+    st.dataframe(iris_data, use_container_width=True, height=280)
 
 # =========================
 # Tab 2: 特征可视化
@@ -693,7 +707,10 @@ with tab2:
     st.divider()
 
     st.subheader("2. 3D PCA 降维展示")
-    st.plotly_chart(plot_pca_3d(iris_data), use_container_width=False)
+    _, center, _ = st.columns([1, 1.35, 1])
+    with center:
+        st.plotly_chart(plot_pca_3d(iris_data), use_container_width=False)
+
     st.info("💡 降维分析：主成分分析（PCA）将 4 维特征映射至 3 维空间。可以看出，Setosa 形成了较为独立的聚簇，而 Versicolour 与 Virginica 的边界更接近。")
 
 # =========================
@@ -701,7 +718,11 @@ with tab2:
 # =========================
 with tab3:
     st.subheader("多指标模型比较热力图")
-    st.pyplot(plot_multi_metrics_heatmap(iris_data))
+
+    _, center, _ = st.columns([1, 1.25, 1])
+    with center:
+        st.pyplot(plot_multi_metrics_heatmap(iris_data), use_container_width=False)
+
     st.info(
         "💡 学术解析：该热力图从 Accuracy、Precision、Recall 与 F1-Score 四个维度同时比较了四种模型的基准性能。整体来看，树模型（Random Forest、XGBoost）通常在综合指标上表现更稳定，而距离/空间模型（KNN、SVM）则更依赖特征空间的分布结构。该结果可以作为后续交互式调参与模型分析的基准参考。"
     )
@@ -721,92 +742,65 @@ with tab4:
     if model_name == "KNN":
         st.markdown("### K-Nearest Neighbors (KNN) Evaluation")
         k = st.sidebar.slider("Number of Neighbors (k)", min_value=1, max_value=20, value=5, step=1)
-
         result = run_knn(iris_data, k=k)
 
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
-        st.pyplot(plot_decision_boundary(iris_data, "KNN", k=k))
+
+        _, center, _ = st.columns([1, 1.18, 1])
+        with center:
+            st.pyplot(plot_decision_boundary(iris_data, "KNN", k=k), use_container_width=False)
 
         col1, col2 = st.columns(2)
-
         with col1:
             st.pyplot(result["cm_fig"], use_container_width=False)
             st.info(get_objective_cm_text(result["cm"], result["labels"]))
-
         with col2:
             st.subheader("Classification Report")
-            st.dataframe(result["report_df"], use_container_width=True, height=300)
+            st.dataframe(result["report_df"], use_container_width=True, height=260)
 
     elif model_name == "SVM":
         st.markdown("### Support Vector Machine (SVM) Evaluation")
-        c_value = st.sidebar.selectbox(
-            "Regularization Parameter (C)",
-            [0.01, 0.1, 1, 10, 100],
-            index=2
-        )
-
+        c_value = st.sidebar.selectbox("Regularization Parameter (C)", [0.01, 0.1, 1, 10, 100], index=2)
         result = run_svm(iris_data, c_value=c_value)
 
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
-        st.pyplot(plot_decision_boundary(iris_data, "SVM", c_value=c_value))
+
+        _, center, _ = st.columns([1, 1.18, 1])
+        with center:
+            st.pyplot(plot_decision_boundary(iris_data, "SVM", c_value=c_value), use_container_width=False)
 
         col1, col2 = st.columns(2)
-
         with col1:
             st.pyplot(result["cm_fig"], use_container_width=False)
             st.info(get_objective_cm_text(result["cm"], result["labels"]))
-
         with col2:
             st.subheader("Classification Report")
-            st.dataframe(result["report_df"], use_container_width=True, height=300)
+            st.dataframe(result["report_df"], use_container_width=True, height=260)
 
     elif model_name == "Random Forest":
         st.markdown("### Random Forest Evaluation")
-        n_estimators = st.sidebar.slider(
-            "Number of Trees",
-            min_value=10,
-            max_value=500,
-            value=200,
-            step=10
-        )
-
+        n_estimators = st.sidebar.slider("Number of Trees", min_value=10, max_value=500, value=200, step=10)
         result = run_random_forest(iris_data, n_estimators=n_estimators)
 
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
-        st.pyplot(plot_decision_boundary(iris_data, "Random Forest", n_estimators=n_estimators))
+
+        _, center, _ = st.columns([1, 1.18, 1])
+        with center:
+            st.pyplot(plot_decision_boundary(iris_data, "Random Forest", n_estimators=n_estimators), use_container_width=False)
 
         col1, col2 = st.columns(2)
-
         with col1:
             st.pyplot(result["cm_fig"], use_container_width=False)
             st.info(get_objective_cm_text(result["cm"], result["labels"]))
-
         with col2:
             st.subheader("Classification Report")
-            st.dataframe(result["report_df"], use_container_width=True, height=300)
+            st.dataframe(result["report_df"], use_container_width=True, height=260)
 
     else:
         st.markdown("### XGBoost Evaluation")
-
-        n_estimators = st.sidebar.slider(
-            "Number of Boosting Rounds",
-            min_value=50,
-            max_value=300,
-            value=100,
-            step=10
-        )
-        max_depth = st.sidebar.slider(
-            "Maximum Tree Depth",
-            min_value=2,
-            max_value=8,
-            value=3,
-            step=1
-        )
-        learning_rate = st.sidebar.select_slider(
-            "Learning Rate",
-            options=[0.01, 0.05, 0.1, 0.2, 0.3],
-            value=0.1
-        )
+        n_estimators = st.sidebar.slider("Number of Boosting Rounds", min_value=50, max_value=300, value=100, step=10)
+        max_depth = st.sidebar.slider("Maximum Tree Depth", min_value=2, max_value=8, value=3, step=1)
+        learning_rate = st.sidebar.select_slider("Learning Rate", options=[0.01, 0.05, 0.1, 0.2, 0.3], value=0.1)
 
         result = run_xgboost(
             iris_data,
@@ -819,25 +813,27 @@ with tab4:
             st.error(result["error"])
         else:
             st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
-            st.pyplot(
-                plot_decision_boundary(
-                    iris_data,
-                    "XGBoost",
-                    n_estimators=n_estimators,
-                    max_depth=max_depth,
-                    learning_rate=learning_rate
+
+            _, center, _ = st.columns([1, 1.18, 1])
+            with center:
+                st.pyplot(
+                    plot_decision_boundary(
+                        iris_data,
+                        "XGBoost",
+                        n_estimators=n_estimators,
+                        max_depth=max_depth,
+                        learning_rate=learning_rate
+                    ),
+                    use_container_width=False
                 )
-            )
 
             col1, col2 = st.columns(2)
-
             with col1:
                 st.pyplot(result["cm_fig"], use_container_width=False)
                 st.info(get_objective_cm_text(result["cm"], result["labels"]))
-
             with col2:
                 st.subheader("Classification Report")
-                st.dataframe(result["report_df"], use_container_width=True, height=300)
+                st.dataframe(result["report_df"], use_container_width=True, height=260)
 
 st.sidebar.markdown("---")
 st.sidebar.info("👨‍💻 操作提示：请在上方下拉菜单中选择分类算法，并通过拖拽滑块实时调整模型超参数以观察分类效果。")
