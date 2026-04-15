@@ -449,8 +449,8 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
     y_min, y_max = X_2d[:, 1].min() - 0.5, X_2d[:, 1].max() + 0.5
 
     xx, yy = np.meshgrid(
-        np.arange(x_min, x_max, 0.02),
-        np.arange(y_min, y_max, 0.02)
+        np.arange(x_min, x_max, 0.05),
+        np.arange(y_min, y_max, 0.05)
     )
 
     Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
