@@ -33,13 +33,12 @@ st.set_page_config(
     layout="wide"
 )
 
-# 页面宽度与间距优化
 st.markdown("""
 <style>
 .block-container {
     max-width: 1280px;
-    padding-top: 1.2rem;
-    padding-bottom: 1.2rem;
+    padding-top: 1.1rem;
+    padding-bottom: 1.1rem;
 }
 div[data-testid="stMetric"] {
     background: #fafafa;
@@ -62,7 +61,6 @@ MORANDI_DICT = {
     "Virginica": "#B2F2BB"
 }
 MORANDI_PALETTE = list(MORANDI_DICT.values())
-PRIMARY_COLOR = "#7EA6E0"
 
 plt.style.use("default")
 plt.rcParams["axes.unicode_minus"] = False
@@ -127,9 +125,13 @@ def get_train_test_data(iris_data):
 # =========================
 # 3. 图表函数
 # =========================
+@st.cache_data
+def get_corr_matrix(iris_data):
+    return iris_data[FEATURE_COLS].corr()
+
+
 def plot_violin(iris_data):
-    # 放大到你当前版本的大约 1.5 倍左右
-    fig, axes = plt.subplots(2, 2, figsize=(7.8, 5.7))
+    fig, axes = plt.subplots(2, 2, figsize=(11.2, 8.1))
     fig.suptitle(
         "Feature Distribution Analysis",
         fontsize=13,
@@ -186,7 +188,7 @@ def plot_scatter(iris_data):
 
 
 def plot_heatmap(iris_data):
-    corr_matrix = iris_data[FEATURE_COLS].corr()
+    corr_matrix = get_corr_matrix(iris_data)
 
     fig, ax = plt.subplots(figsize=(4.8, 3.6))
     sns.heatmap(
@@ -293,7 +295,8 @@ def plot_confusion_matrix(cm, labels, title):
     return fig
 
 
-def plot_multi_metrics_heatmap(iris_data):
+@st.cache_data
+def get_multi_metrics_df(iris_data):
     X = iris_data[FEATURE_COLS]
     y = iris_data["species"]
 
@@ -349,7 +352,7 @@ def plot_multi_metrics_heatmap(iris_data):
         from xgboost import XGBClassifier
 
         xgb_model = XGBClassifier(
-            n_estimators=100,
+            n_estimators=80,
             max_depth=3,
             learning_rate=0.1,
             subsample=0.9,
@@ -379,9 +382,12 @@ def plot_multi_metrics_heatmap(iris_data):
     except Exception:
         pass
 
-    metrics_df = pd.DataFrame(results).T
+    return pd.DataFrame(results).T
 
-    # 放大到当前版本的接近 2 倍
+
+def plot_multi_metrics_heatmap(iris_data):
+    metrics_df = get_multi_metrics_df(iris_data)
+
     fig, ax = plt.subplots(figsize=(7.8, 5.7))
     sns.heatmap(
         metrics_df,
@@ -448,6 +454,7 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
     x_min, x_max = X_2d[:, 0].min() - 0.5, X_2d[:, 0].max() + 0.5
     y_min, y_max = X_2d[:, 1].min() - 0.5, X_2d[:, 1].max() + 0.5
 
+    # 优化性能：步长调大，减少预测点数量
     xx, yy = np.meshgrid(
         np.arange(x_min, x_max, 0.05),
         np.arange(y_min, y_max, 0.05)
@@ -458,8 +465,7 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
 
     cmap_light = ListedColormap(["#FFD1CF", "#D4F0FA", "#D4FADD"])
 
-    # 放大到当前版本的接近 2 倍
-    fig, ax = plt.subplots(figsize=(6.3, 4))
+    fig, ax = plt.subplots(figsize=(6.3, 4.0))
     ax.contourf(xx, yy, Z, cmap=cmap_light, alpha=0.6)
 
     sns.scatterplot(
@@ -567,7 +573,7 @@ def run_random_forest(iris_data, n_estimators=200):
     }
 
 
-def run_xgboost(iris_data, n_estimators=100, max_depth=3, learning_rate=0.1):
+def run_xgboost(iris_data, n_estimators=80, max_depth=3, learning_rate=0.1):
     try:
         from xgboost import XGBClassifier
     except ImportError:
@@ -706,9 +712,7 @@ with tab2:
     st.divider()
 
     st.subheader("2. 3D PCA 降维展示")
-    _, center, _ = st.columns([1, 1.35, 1])
-    with center:
-        st.plotly_chart(plot_pca_3d(iris_data), use_container_width=False)
+    st.plotly_chart(plot_pca_3d(iris_data), use_container_width=False)
 
     st.info("💡 降维分析：主成分分析（PCA）将 4 维特征映射至 3 维空间。可以看出，Setosa 形成了较为独立的聚簇，而 Versicolour 与 Virginica 的边界更接近。")
 
@@ -745,13 +749,14 @@ with tab4:
         st.subheader("决策边界图")
         st.pyplot(plot_decision_boundary(iris_data, "KNN", k=k), use_container_width=False)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.pyplot(result["cm_fig"], use_container_width=False)
-            st.info(get_objective_cm_text(result["cm"], result["labels"]))
-        with col2:
-            st.subheader("Classification Report")
-            st.dataframe(result["report_df"], use_container_width=True, height=260)
+        st.subheader("混淆矩阵")
+        st.pyplot(result["cm_fig"], use_container_width=False)
+
+        st.subheader("错判统计")
+        st.info(get_objective_cm_text(result["cm"], result["labels"]))
+
+        st.subheader("分类指标报告")
+        st.dataframe(result["report_df"], use_container_width=True, height=260)
 
     elif model_name == "SVM":
         st.markdown("### Support Vector Machine (SVM) Evaluation")
@@ -763,13 +768,14 @@ with tab4:
         st.subheader("决策边界图")
         st.pyplot(plot_decision_boundary(iris_data, "SVM", c_value=c_value), use_container_width=False)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.pyplot(result["cm_fig"], use_container_width=False)
-            st.info(get_objective_cm_text(result["cm"], result["labels"]))
-        with col2:
-            st.subheader("Classification Report")
-            st.dataframe(result["report_df"], use_container_width=True, height=260)
+        st.subheader("混淆矩阵")
+        st.pyplot(result["cm_fig"], use_container_width=False)
+
+        st.subheader("错判统计")
+        st.info(get_objective_cm_text(result["cm"], result["labels"]))
+
+        st.subheader("分类指标报告")
+        st.dataframe(result["report_df"], use_container_width=True, height=260)
 
     elif model_name == "Random Forest":
         st.markdown("### Random Forest Evaluation")
@@ -781,17 +787,18 @@ with tab4:
         st.subheader("决策边界图")
         st.pyplot(plot_decision_boundary(iris_data, "Random Forest", n_estimators=n_estimators), use_container_width=False)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.pyplot(result["cm_fig"], use_container_width=False)
-            st.info(get_objective_cm_text(result["cm"], result["labels"]))
-        with col2:
-            st.subheader("Classification Report")
-            st.dataframe(result["report_df"], use_container_width=True, height=260)
+        st.subheader("混淆矩阵")
+        st.pyplot(result["cm_fig"], use_container_width=False)
+
+        st.subheader("错判统计")
+        st.info(get_objective_cm_text(result["cm"], result["labels"]))
+
+        st.subheader("分类指标报告")
+        st.dataframe(result["report_df"], use_container_width=True, height=260)
 
     else:
         st.markdown("### XGBoost Evaluation")
-        n_estimators = st.sidebar.slider("Number of Boosting Rounds", min_value=50, max_value=300, value=100, step=10)
+        n_estimators = st.sidebar.slider("Number of Boosting Rounds", min_value=50, max_value=300, value=80, step=10)
         max_depth = st.sidebar.slider("Maximum Tree Depth", min_value=2, max_value=8, value=3, step=1)
         learning_rate = st.sidebar.select_slider("Learning Rate", options=[0.01, 0.05, 0.1, 0.2, 0.3], value=0.1)
 
@@ -819,13 +826,14 @@ with tab4:
                 use_container_width=False
             )
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.pyplot(result["cm_fig"], use_container_width=False)
-                st.info(get_objective_cm_text(result["cm"], result["labels"]))
-            with col2:
-                st.subheader("Classification Report")
-                st.dataframe(result["report_df"], use_container_width=True, height=260)
+            st.subheader("混淆矩阵")
+            st.pyplot(result["cm_fig"], use_container_width=False)
+
+            st.subheader("错判统计")
+            st.info(get_objective_cm_text(result["cm"], result["labels"]))
+
+            st.subheader("分类指标报告")
+            st.dataframe(result["report_df"], use_container_width=True, height=260)
 
 st.sidebar.markdown("---")
 st.sidebar.info("👨‍💻 操作提示：请在上方下拉菜单中选择分类算法，并通过拖拽滑块实时调整模型超参数以观察分类效果。")
