@@ -459,7 +459,7 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
     cmap_light = ListedColormap(["#FFD1CF", "#D4F0FA", "#D4FADD"])
 
     # 放大到当前版本的接近 2 倍
-    fig, ax = plt.subplots(figsize=(18.4, 11.6))
+    fig, ax = plt.subplots(figsize=(13, 8.1))
     ax.contourf(xx, yy, Z, cmap=cmap_light, alpha=0.6)
 
     sns.scatterplot(
@@ -662,7 +662,7 @@ with st.expander("📊 系统功能简介", expanded=True):
     """)
 
 tab1, tab2, tab3, tab4 = st.tabs([
-    "Data & Statistics",
+    "Data Overview",
     "Feature Engineering",
     "Model Baseline",
     "Interactive Demo"
