@@ -108,8 +108,14 @@ def get_train_test_data(iris_data):
 # 3. 基础可视化函数
 # =========================
 def plot_violin(iris_data):
-    fig, axes = plt.subplots(2, 2, figsize=(5.2, 3.8))
-    fig.suptitle("Feature Distribution Analysis (Violin Plots)", fontsize=10.5, fontweight="bold", y=1.01)
+    # 明显缩小：原来很大，这里直接压到更紧凑
+    fig, axes = plt.subplots(2, 2, figsize=(4.8, 3.4))
+    fig.suptitle(
+        "Feature Distribution Analysis (Violin Plots)",
+        fontsize=9.5,
+        fontweight="bold",
+        y=1.01
+    )
 
     for i, col in enumerate(FEATURE_COLS):
         ax = axes[i // 2, i % 2]
@@ -119,39 +125,43 @@ def plot_violin(iris_data):
             y=col,
             palette=MORANDI_PALETTE,
             inner="quartile",
-            linewidth=0.9,
+            linewidth=0.8,
+            cut=0,
             ax=ax
         )
-        ax.set_title(f"{col}", fontweight="bold", pad=4, fontsize=8.5)
+        ax.set_title(col, fontweight="bold", pad=3, fontsize=7.8)
         ax.set_xlabel("")
-        ax.set_ylabel("cm", fontsize=8)
-        ax.tick_params(axis="x", labelsize=7, rotation=15)
-        ax.tick_params(axis="y", labelsize=7)
+        ax.set_ylabel("cm", fontsize=7.2)
+        ax.tick_params(axis="x", labelsize=6.2, rotation=15)
+        ax.tick_params(axis="y", labelsize=6.2)
 
-    plt.tight_layout(pad=0.4)
+    plt.tight_layout(pad=0.25)
     return fig
 
+
 def plot_scatter(iris_data):
-    fig, ax = plt.subplots(figsize=(6.2, 4.2))
+    fig, ax = plt.subplots(figsize=(5.4, 3.6))
     sns.scatterplot(
         data=iris_data,
         x="petallength",
         y="petalwidth",
         hue="species",
         hue_order=SPECIES_ORDER,
-        s=70,
+        s=48,
         palette=MORANDI_PALETTE,
         edgecolor="black",
         alpha=0.8,
         ax=ax
     )
 
-    ax.set_title("Basic View: 2D Scatter Distribution", fontweight="bold", pad=10, fontsize=12)
-    ax.set_xlabel("Petal Length")
-    ax.set_ylabel("Petal Width")
-    ax.legend(title="Species", loc="upper left", frameon=False, fontsize=9, title_fontsize=10)
+    ax.set_title("Basic View: 2D Scatter Distribution", fontweight="bold", pad=8, fontsize=10.5)
+    ax.set_xlabel("Petal Length", fontsize=8.5)
+    ax.set_ylabel("Petal Width", fontsize=8.5)
+    ax.tick_params(axis="x", labelsize=7)
+    ax.tick_params(axis="y", labelsize=7)
+    ax.legend(title="Species", loc="upper left", frameon=False, fontsize=7, title_fontsize=8)
 
-    plt.tight_layout(pad=0.8)
+    plt.tight_layout(pad=0.35)
     return fig
 
 
@@ -159,7 +169,7 @@ def plot_heatmap(iris_data):
     numeric_df = iris_data[FEATURE_COLS]
     corr_matrix = numeric_df.corr()
 
-    fig, ax = plt.subplots(figsize=(6.2, 4.2))
+    fig, ax = plt.subplots(figsize=(5.2, 3.8))
     sns.heatmap(
         corr_matrix,
         annot=True,
@@ -171,22 +181,22 @@ def plot_heatmap(iris_data):
         linewidths=0.5,
         cbar=True,
         ax=ax,
-        annot_kws={"size": 9, "color": "#222222"}
+        annot_kws={"size": 8, "color": "#222222"}
     )
 
-    ax.set_title("Advanced Analysis: Feature Correlation Heatmap", fontweight="bold", pad=10, fontsize=12)
+    ax.set_title("Advanced Analysis: Feature Correlation Heatmap", fontweight="bold", pad=8, fontsize=10.5)
     ax.set_xlabel("")
     ax.set_ylabel("")
 
     for label in ax.get_xticklabels():
         label.set_rotation(30)
         label.set_ha("right")
-        label.set_fontsize(9)
+        label.set_fontsize(7)
 
     for label in ax.get_yticklabels():
-        label.set_fontsize(9)
+        label.set_fontsize(7)
 
-    plt.tight_layout(pad=0.8)
+    plt.tight_layout(pad=0.35)
     return fig
 
 
@@ -214,27 +224,27 @@ def plot_pca_3d(iris_data):
             "PC2": "Principal Component 2",
             "PC3": "Principal Component 3"
         },
-        opacity=0.9
+        opacity=0.88
     )
 
-    fig.update_traces(marker=dict(size=4))
+    fig.update_traces(marker=dict(size=2.6))
 
     fig.update_layout(
         template="simple_white",
-        height=500,
+        height=300,
         scene=dict(
             xaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#E5E5E5", showbackground=False),
             yaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#E5E5E5", showbackground=False),
             zaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#E5E5E5", showbackground=False),
         ),
-        font=dict(family="Times New Roman", size=11, color="#333333"),
-        margin=dict(l=0, r=0, b=0, t=40)
+        font=dict(family="Times New Roman", size=10, color="#333333"),
+        margin=dict(l=0, r=0, b=0, t=34)
     )
     return fig
 
 
 def plot_confusion_matrix(cm, labels, title):
-    fig, ax = plt.subplots(figsize=(4.8, 4.0))
+    fig, ax = plt.subplots(figsize=(4.1, 3.3))
     sns.heatmap(
         cm,
         annot=True,
@@ -243,24 +253,24 @@ def plot_confusion_matrix(cm, labels, title):
         cbar=True,
         xticklabels=labels,
         yticklabels=labels,
-        linewidths=0.5,
+        linewidths=0.45,
         ax=ax,
-        annot_kws={"size": 11, "color": "#222222"}
+        annot_kws={"size": 9.5, "color": "#222222"}
     )
 
-    ax.set_title(title, fontweight="bold", pad=10, fontsize=11)
-    ax.set_xlabel("Predicted Label")
-    ax.set_ylabel("True Label")
+    ax.set_title(title, fontweight="bold", pad=7, fontsize=9.5)
+    ax.set_xlabel("Predicted Label", fontsize=7.8)
+    ax.set_ylabel("True Label", fontsize=7.8)
 
     for label in ax.get_xticklabels():
         label.set_rotation(0)
-        label.set_fontsize(9)
+        label.set_fontsize(6.5)
 
     for label in ax.get_yticklabels():
         label.set_rotation(0)
-        label.set_fontsize(9)
+        label.set_fontsize(6.5)
 
-    plt.tight_layout(pad=0.8)
+    plt.tight_layout(pad=0.3)
     return fig
 
 
@@ -355,25 +365,25 @@ def plot_multi_metrics_heatmap(iris_data):
 
     metrics_df = pd.DataFrame(results).T
 
-    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    fig, ax = plt.subplots(figsize=(6.0, 3.6))
     sns.heatmap(
         metrics_df,
         annot=True,
         fmt=".4f",
         cmap="PuBu",
-        linewidths=1,
+        linewidths=0.8,
         linecolor="white",
         cbar=True,
         ax=ax,
-        annot_kws={"size": 10, "fontweight": "bold"}
+        annot_kws={"size": 8.5, "fontweight": "bold"}
     )
 
-    ax.set_title("Multi-Metric Model Comparison", fontsize=12, fontweight="bold", pad=12)
+    ax.set_title("Multi-Metric Model Comparison", fontsize=10.5, fontweight="bold", pad=8)
     ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
-    ax.tick_params(axis="x", labelsize=9)
-    ax.tick_params(axis="y", labelsize=9)
+    ax.tick_params(axis="x", labelsize=7)
+    ax.tick_params(axis="y", labelsize=7)
 
-    plt.tight_layout(pad=0.8)
+    plt.tight_layout(pad=0.35)
     return fig
 
 
@@ -431,7 +441,7 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
 
     cmap_light = ListedColormap(["#FFD1CF", "#D4F0FA", "#D4FADD"])
 
-    fig, ax = plt.subplots(figsize=(8.2, 4.8))
+    fig, ax = plt.subplots(figsize=(5.0, 3.1))
     ax.contourf(xx, yy, Z, cmap=cmap_light, alpha=0.6)
 
     sns.scatterplot(
@@ -440,17 +450,19 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
         hue=plot_df["species"],
         palette=MORANDI_PALETTE,
         edgecolor="#555555",
-        s=45,
+        s=20,
         alpha=0.9,
         ax=ax
     )
 
-    ax.set_title(title, fontweight="bold", pad=10, fontsize=12)
-    ax.set_xlabel("Petal Length (cm)")
-    ax.set_ylabel("Petal Width (cm)")
-    ax.legend(title="True Species", loc="upper left", frameon=False, fontsize=9, title_fontsize=10)
+    ax.set_title(title, fontweight="bold", pad=5, fontsize=9)
+    ax.set_xlabel("Petal Length (cm)", fontsize=7)
+    ax.set_ylabel("Petal Width (cm)", fontsize=7)
+    ax.tick_params(axis="x", labelsize=6)
+    ax.tick_params(axis="y", labelsize=6)
+    ax.legend(title="True Species", loc="upper left", frameon=False, fontsize=6, title_fontsize=7)
 
-    plt.tight_layout(pad=0.8)
+    plt.tight_layout(pad=0.25)
     return fig
 
 
@@ -660,7 +672,7 @@ with tab1:
     st.success("📊 图表解析：小提琴图展示了四个特征在三类样本中的分布形态。可以直观看出，花瓣长度与花瓣宽度的类别区分度明显高于花萼特征，因此它们通常提供更强的分类信息。")
 
     st.subheader("3. 原始数据预览")
-    st.dataframe(iris_data, use_container_width=True, height=320)
+    st.dataframe(iris_data, use_container_width=True, height=300)
 
 # =========================
 # Tab 2: 特征可视化
@@ -671,17 +683,17 @@ with tab2:
     col1, col2 = st.columns(2)
 
     with col1:
-        st.pyplot(plot_scatter(iris_data), use_container_width=True)
+        st.pyplot(plot_scatter(iris_data), use_container_width=False)
         st.success("📊 图表解析：Setosa 在花瓣尺寸上明显更小，与另外两类容易分开；Versicolour 与 Virginica 在边界附近存在一定重叠。")
 
     with col2:
-        st.pyplot(plot_heatmap(iris_data), use_container_width=True)
+        st.pyplot(plot_heatmap(iris_data), use_container_width=False)
         st.success("📊 图表解析：热力图展示了四个数值特征之间的相关性。花瓣长度与花瓣宽度相关性较强，说明这两个特征对分类非常关键。")
 
     st.divider()
 
     st.subheader("2. 3D PCA 降维展示")
-    st.plotly_chart(plot_pca_3d(iris_data))
+    st.plotly_chart(plot_pca_3d(iris_data), use_container_width=False)
     st.info("💡 降维分析：主成分分析（PCA）将 4 维特征映射至 3 维空间。可以看出，Setosa 形成了较为独立的聚簇，而 Versicolour 与 Virginica 的边界更接近。")
 
 # =========================
@@ -713,19 +725,17 @@ with tab4:
         result = run_knn(iris_data, k=k)
 
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
-        st.pyplot(
-            plot_decision_boundary(iris_data, "KNN", k=k)
-        )
+        st.pyplot(plot_decision_boundary(iris_data, "KNN", k=k))
 
         col1, col2 = st.columns(2)
 
         with col1:
-            st.pyplot(result["cm_fig"], use_container_width=True)
+            st.pyplot(result["cm_fig"], use_container_width=False)
             st.info(get_objective_cm_text(result["cm"], result["labels"]))
 
         with col2:
             st.subheader("Classification Report")
-            st.dataframe(result["report_df"], use_container_width=True, height=420)
+            st.dataframe(result["report_df"], use_container_width=True, height=300)
 
     elif model_name == "SVM":
         st.markdown("### Support Vector Machine (SVM) Evaluation")
@@ -738,19 +748,17 @@ with tab4:
         result = run_svm(iris_data, c_value=c_value)
 
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
-        st.pyplot(
-            plot_decision_boundary(iris_data, "SVM", c_value=c_value)
-        )
+        st.pyplot(plot_decision_boundary(iris_data, "SVM", c_value=c_value))
 
         col1, col2 = st.columns(2)
 
         with col1:
-            st.pyplot(result["cm_fig"], use_container_width=True)
+            st.pyplot(result["cm_fig"], use_container_width=False)
             st.info(get_objective_cm_text(result["cm"], result["labels"]))
 
         with col2:
             st.subheader("Classification Report")
-            st.dataframe(result["report_df"], use_container_width=True, height=420)
+            st.dataframe(result["report_df"], use_container_width=True, height=300)
 
     elif model_name == "Random Forest":
         st.markdown("### Random Forest Evaluation")
@@ -765,19 +773,17 @@ with tab4:
         result = run_random_forest(iris_data, n_estimators=n_estimators)
 
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
-        st.pyplot(
-            plot_decision_boundary(iris_data, "Random Forest", n_estimators=n_estimators)
-        )
+        st.pyplot(plot_decision_boundary(iris_data, "Random Forest", n_estimators=n_estimators))
 
         col1, col2 = st.columns(2)
 
         with col1:
-            st.pyplot(result["cm_fig"], use_container_width=True)
+            st.pyplot(result["cm_fig"], use_container_width=False)
             st.info(get_objective_cm_text(result["cm"], result["labels"]))
 
         with col2:
             st.subheader("Classification Report")
-            st.dataframe(result["report_df"], use_container_width=True, height=420)
+            st.dataframe(result["report_df"], use_container_width=True, height=300)
 
     else:
         st.markdown("### XGBoost Evaluation")
@@ -826,12 +832,12 @@ with tab4:
             col1, col2 = st.columns(2)
 
             with col1:
-                st.pyplot(result["cm_fig"], use_container_width=True)
+                st.pyplot(result["cm_fig"], use_container_width=False)
                 st.info(get_objective_cm_text(result["cm"], result["labels"]))
 
             with col2:
                 st.subheader("Classification Report")
-                st.dataframe(result["report_df"], use_container_width=True, height=420)
+                st.dataframe(result["report_df"], use_container_width=True, height=300)
 
 st.sidebar.markdown("---")
 st.sidebar.info("👨‍💻 操作提示：请在上方下拉菜单中选择分类算法，并通过拖拽滑块实时调整模型超参数以观察分类效果。")
