@@ -915,7 +915,7 @@ with tab3:
     st.pyplot(plot_best_model_heatmap(iris_data), use_container_width=False)
 
     st.info(
-        "💡 学术解析：该热力图与核心代码最后一张图一致，基于最佳参数模型比较 Accuracy、Precision、Recall 与 F1-Score 四项指标，可作为后续交互式调参与模型分析的基准参考。"
+        "💡 图表解析：该热力图展示了四种分类算法在最佳参数上的性能对比，其中，KNN 和 SVM 的综合表现最好，两者在四项指标上结果完全一致，说明这两种模型在本实验中的分类能力最强，且整体表现较为稳定。"
     )
 
 # =========================
