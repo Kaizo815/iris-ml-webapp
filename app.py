@@ -30,6 +30,7 @@ try:
 except Exception:
     XGB_AVAILABLE = False
 
+
 # =========================
 # 0. 页面基础设置
 # =========================
@@ -58,6 +59,7 @@ div[data-testid="stDataFrame"] {
 </style>
 """, unsafe_allow_html=True)
 
+
 # =========================
 # 1. 全局绘图风格与配色
 # =========================
@@ -85,16 +87,24 @@ plt.rcParams["axes.spines.right"] = False
 SPECIES_ORDER = ["Setosa", "Versicolour", "Virginica"]
 FEATURE_COLS = ["sepallength", "sepalwidth", "petallength", "petalwidth"]
 
-# 你的核心代码最后那张热力图对应的最佳参数
 BEST_K = 9
 BEST_C = 10
 BEST_RF_N = 50
 BEST_XGB_N = 10
 
+
 # =========================
-# 2. 数据准备函数
+# 2. 通用工具
 # =========================
-@st.cache_data
+def show_fig(fig, use_container_width=False):
+    st.pyplot(fig, use_container_width=use_container_width)
+    plt.close(fig)
+
+
+# =========================
+# 3. 数据准备函数
+# =========================
+@st.cache_data(show_spinner=False)
 def load_data():
     iris = datasets.load_iris()
 
@@ -120,28 +130,84 @@ def load_data():
     return iris_data, summary
 
 
-def get_train_test_data(iris_data):
-    X = iris_data[FEATURE_COLS]
-    y = iris_data["species"]
+@st.cache_data(show_spinner=False)
+def get_prepared_data(iris_data):
+    X = iris_data[FEATURE_COLS].copy()
+    y_text = iris_data["species"].copy()
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
+    le = LabelEncoder()
+    y_encoded = le.fit_transform(y_text)
+
+    indices = np.arange(len(X))
+    train_idx, test_idx = train_test_split(
+        indices,
         test_size=0.25,
         random_state=42,
-        stratify=y
+        stratify=y_text
     )
-    return X_train, X_test, y_train, y_test
+
+    X_train = X.iloc[train_idx].reset_index(drop=True)
+    X_test = X.iloc[test_idx].reset_index(drop=True)
+
+    y_train_text = y_text.iloc[train_idx].reset_index(drop=True)
+    y_test_text = y_text.iloc[test_idx].reset_index(drop=True)
+
+    y_train_encoded = y_encoded[train_idx]
+    y_test_encoded = y_encoded[test_idx]
+
+    scaler = StandardScaler()
+    X_train_std = scaler.fit_transform(X_train)
+    X_test_std = scaler.transform(X_test)
+
+    return {
+        "X": X,
+        "y_text": y_text,
+        "y_encoded": y_encoded,
+        "label_classes": list(le.classes_),
+        "X_train": X_train,
+        "X_test": X_test,
+        "y_train_text": y_train_text,
+        "y_test_text": y_test_text,
+        "y_train_encoded": y_train_encoded,
+        "y_test_encoded": y_test_encoded,
+        "X_train_std": X_train_std,
+        "X_test_std": X_test_std
+    }
 
 
-# =========================
-# 3. 图表函数
-# =========================
-@st.cache_data
+def get_train_test_data(iris_data):
+    prepared = get_prepared_data(iris_data)
+    return (
+        prepared["X_train"],
+        prepared["X_test"],
+        prepared["y_train_text"],
+        prepared["y_test_text"]
+    )
+
+
+@st.cache_data(show_spinner=False)
 def get_corr_matrix(iris_data):
     return iris_data[FEATURE_COLS].corr()
 
 
+@st.cache_data(show_spinner=False)
+def get_pca_data(iris_data):
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(iris_data[FEATURE_COLS])
+
+    pca = PCA(n_components=3)
+    components = pca.fit_transform(X_scaled)
+
+    pca_df = pd.DataFrame(components, columns=["PC1", "PC2", "PC3"])
+    pca_df["species"] = iris_data["species"]
+    exp_var_cumul = pca.explained_variance_ratio_.cumsum()
+
+    return pca_df, float(exp_var_cumul[-1])
+
+
+# =========================
+# 4. 图表函数
+# =========================
 def plot_violin(iris_data):
     fig, axes = plt.subplots(2, 2, figsize=(11.2, 8.1))
     fig.suptitle(
@@ -234,15 +300,7 @@ def plot_heatmap(iris_data):
 
 
 def plot_pca_3d(iris_data):
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(iris_data[FEATURE_COLS])
-
-    pca = PCA(n_components=3)
-    components = pca.fit_transform(X_scaled)
-
-    pca_df = pd.DataFrame(components, columns=["PC1", "PC2", "PC3"])
-    pca_df["species"] = iris_data["species"]
-    exp_var_cumul = pca.explained_variance_ratio_.cumsum()
+    pca_df, exp_var_cumul = get_pca_data(iris_data)
 
     fig = px.scatter_3d(
         pca_df,
@@ -251,7 +309,7 @@ def plot_pca_3d(iris_data):
         z="PC3",
         color="species",
         color_discrete_map=MORANDI_DICT,
-        title=f"3D PCA Dimensionality Reduction (Cum. Variance: {exp_var_cumul[-1]:.2%})",
+        title=f"3D PCA Dimensionality Reduction (Cum. Variance: {exp_var_cumul:.2%})",
         labels={
             "PC1": "Principal Component 1",
             "PC2": "Principal Component 2",
@@ -261,7 +319,6 @@ def plot_pca_3d(iris_data):
     )
 
     fig.update_traces(marker=dict(size=2.8))
-
     fig.update_layout(
         template="simple_white",
         height=320,
@@ -307,62 +364,47 @@ def plot_confusion_matrix(cm, labels, title):
     return fig
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def get_baseline_curve_data(iris_data):
-    X = iris_data[FEATURE_COLS]
-    y = iris_data["species"]
+    prepared = get_prepared_data(iris_data)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=0.25,
-        random_state=42,
-        stratify=y
-    )
-
-    scaler = StandardScaler()
-    X_train_std = scaler.fit_transform(X_train)
-    X_test_std = scaler.transform(X_test)
+    X_train = prepared["X_train"]
+    X_test = prepared["X_test"]
+    y_train_text = prepared["y_train_text"]
+    y_test_text = prepared["y_test_text"]
+    X_train_std = prepared["X_train_std"]
+    X_test_std = prepared["X_test_std"]
+    y_train_encoded = prepared["y_train_encoded"]
+    y_test_encoded = prepared["y_test_encoded"]
 
     # KNN
     k_values = list(range(1, 21))
     knn_acc = []
     for k in k_values:
         model = KNeighborsClassifier(n_neighbors=k)
-        model.fit(X_train_std, y_train)
-        knn_acc.append(accuracy_score(y_test, model.predict(X_test_std)))
+        model.fit(X_train_std, y_train_text)
+        knn_acc.append(accuracy_score(y_test_text, model.predict(X_test_std)))
 
     # SVM
     c_values = [0.01, 0.1, 1, 10, 100]
     svm_acc = []
     for c in c_values:
         model = SVC(C=c, kernel="rbf", gamma="scale", random_state=42)
-        model.fit(X_train_std, y_train)
-        svm_acc.append(accuracy_score(y_test, model.predict(X_test_std)))
+        model.fit(X_train_std, y_train_text)
+        svm_acc.append(accuracy_score(y_test_text, model.predict(X_test_std)))
 
     # Random Forest
     rf_values = [10, 30, 50, 80, 100, 150, 200, 300]
     rf_acc = []
     for n in rf_values:
-        model = RandomForestClassifier(n_estimators=n, random_state=42)
-        model.fit(X_train, y_train)
-        rf_acc.append(accuracy_score(y_test, model.predict(X_test)))
+        model = RandomForestClassifier(n_estimators=n, random_state=42, n_jobs=-1)
+        model.fit(X_train, y_train_text)
+        rf_acc.append(accuracy_score(y_test_text, model.predict(X_test)))
 
     # XGBoost
     xgb_values = [10, 30, 50, 80, 100, 150, 200, 300]
     xgb_acc = None
     if XGB_AVAILABLE:
-        label_encoder = LabelEncoder()
-        y_encoded = label_encoder.fit_transform(y)
-
-        X_train_xgb, X_test_xgb, y_train_xgb, y_test_xgb = train_test_split(
-            X,
-            y_encoded,
-            test_size=0.25,
-            random_state=42,
-            stratify=y_encoded
-        )
-
         xgb_acc = []
         for n in xgb_values:
             model = XGBClassifier(
@@ -378,8 +420,8 @@ def get_baseline_curve_data(iris_data):
                 n_jobs=1,
                 verbosity=0
             )
-            model.fit(X_train_xgb, y_train_xgb)
-            xgb_acc.append(accuracy_score(y_test_xgb, model.predict(X_test_xgb)))
+            model.fit(X_train, y_train_encoded)
+            xgb_acc.append(accuracy_score(y_test_encoded, model.predict(X_test)))
 
     return {
         "knn": {"params": k_values, "acc": knn_acc, "best_param": BEST_K},
@@ -486,37 +528,62 @@ def plot_baseline_accuracy_curves(iris_data):
     return fig
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def get_best_metrics_df(iris_data):
-    X = iris_data[FEATURE_COLS]
-    y = iris_data["species"]
+    prepared = get_prepared_data(iris_data)
 
-    label_encoder = LabelEncoder()
-    y_encoded = label_encoder.fit_transform(y)
+    X_train = prepared["X_train"]
+    X_test = prepared["X_test"]
+    X_train_std = prepared["X_train_std"]
+    X_test_std = prepared["X_test_std"]
+    y_train_text = prepared["y_train_text"]
+    y_test_text = prepared["y_test_text"]
+    y_train_encoded = prepared["y_train_encoded"]
+    y_test_encoded = prepared["y_test_encoded"]
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y_encoded,
-        test_size=0.25,
-        random_state=42,
-        stratify=y_encoded
+    results = {}
+
+    knn_model = KNeighborsClassifier(n_neighbors=BEST_K)
+    knn_model.fit(X_train_std, y_train_text)
+    knn_pred = knn_model.predict(X_test_std)
+    knn_precision, knn_recall, knn_f1, _ = precision_recall_fscore_support(
+        y_test_text, knn_pred, average="macro"
     )
+    results[f"KNN (k={BEST_K})"] = {
+        "Accuracy": accuracy_score(y_test_text, knn_pred),
+        "Precision": knn_precision,
+        "Recall": knn_recall,
+        "F1-Score": knn_f1
+    }
 
-    scaler = StandardScaler()
-    X_train_std = scaler.fit_transform(X_train)
-    X_test_std = scaler.transform(X_test)
+    svm_model = SVC(C=BEST_C, kernel="rbf", gamma="scale", random_state=42)
+    svm_model.fit(X_train_std, y_train_text)
+    svm_pred = svm_model.predict(X_test_std)
+    svm_precision, svm_recall, svm_f1, _ = precision_recall_fscore_support(
+        y_test_text, svm_pred, average="macro"
+    )
+    results[f"SVM (C={BEST_C})"] = {
+        "Accuracy": accuracy_score(y_test_text, svm_pred),
+        "Precision": svm_precision,
+        "Recall": svm_recall,
+        "F1-Score": svm_f1
+    }
 
-    models = {
-        f"KNN (k={BEST_K})": KNeighborsClassifier(n_neighbors=BEST_K),
-        f"SVM (C={BEST_C})": SVC(C=BEST_C, kernel="rbf", gamma="scale", random_state=42),
-        f"Random Forest\n(n={BEST_RF_N})": RandomForestClassifier(
-            n_estimators=BEST_RF_N,
-            random_state=42
-        )
+    rf_model = RandomForestClassifier(n_estimators=BEST_RF_N, random_state=42, n_jobs=-1)
+    rf_model.fit(X_train, y_train_text)
+    rf_pred = rf_model.predict(X_test)
+    rf_precision, rf_recall, rf_f1, _ = precision_recall_fscore_support(
+        y_test_text, rf_pred, average="macro"
+    )
+    results[f"Random Forest\n(n={BEST_RF_N})"] = {
+        "Accuracy": accuracy_score(y_test_text, rf_pred),
+        "Precision": rf_precision,
+        "Recall": rf_recall,
+        "F1-Score": rf_f1
     }
 
     if XGB_AVAILABLE:
-        models[f"XGBoost\n(n={BEST_XGB_N})"] = XGBClassifier(
+        xgb_model = XGBClassifier(
             n_estimators=BEST_XGB_N,
             max_depth=3,
             learning_rate=0.1,
@@ -529,32 +596,16 @@ def get_best_metrics_df(iris_data):
             n_jobs=1,
             verbosity=0
         )
-
-    results = {}
-
-    for name, model in models.items():
-        if "KNN" in name or "SVM" in name:
-            curr_X_train = X_train_std
-            curr_X_test = X_test_std
-        else:
-            curr_X_train = X_train
-            curr_X_test = X_test
-
-        model.fit(curr_X_train, y_train)
-        y_pred = model.predict(curr_X_test)
-
-        acc = accuracy_score(y_test, y_pred)
-        precision, recall, f1, _ = precision_recall_fscore_support(
-            y_test,
-            y_pred,
-            average="macro"
+        xgb_model.fit(X_train, y_train_encoded)
+        xgb_pred = xgb_model.predict(X_test)
+        xgb_precision, xgb_recall, xgb_f1, _ = precision_recall_fscore_support(
+            y_test_encoded, xgb_pred, average="macro"
         )
-
-        results[name] = {
-            "Accuracy": acc,
-            "Precision": precision,
-            "Recall": recall,
-            "F1-Score": f1
+        results[f"XGBoost\n(n={BEST_XGB_N})"] = {
+            "Accuracy": accuracy_score(y_test_encoded, xgb_pred),
+            "Precision": xgb_precision,
+            "Recall": xgb_recall,
+            "F1-Score": xgb_f1
         }
 
     return pd.DataFrame(results).T
@@ -592,7 +643,16 @@ def plot_best_model_heatmap(iris_data):
     return fig
 
 
-def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators=200, max_depth=3, learning_rate=0.1):
+@st.cache_data(show_spinner=False)
+def get_decision_boundary_data(
+    iris_data,
+    model_name,
+    k=5,
+    c_value=1.0,
+    n_estimators=200,
+    max_depth=3,
+    learning_rate=0.1
+):
     plot_df = iris_data.copy()
 
     X_2d = plot_df[["petallength", "petalwidth"]].values
@@ -612,7 +672,8 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
     elif model_name == "Random Forest":
         model = RandomForestClassifier(
             n_estimators=n_estimators,
-            random_state=42
+            random_state=42,
+            n_jobs=-1
         )
         title = f"2D Decision Boundary of Random Forest (Trees={n_estimators})"
 
@@ -645,6 +706,34 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
     Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
     Z = Z.reshape(xx.shape)
 
+    return {
+        "xx": xx,
+        "yy": yy,
+        "Z": Z,
+        "X_2d": X_2d,
+        "species": plot_df["species"].values,
+        "title": title
+    }
+
+
+def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators=200, max_depth=3, learning_rate=0.1):
+    boundary_data = get_decision_boundary_data(
+        iris_data,
+        model_name,
+        k=k,
+        c_value=c_value,
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        learning_rate=learning_rate
+    )
+
+    xx = boundary_data["xx"]
+    yy = boundary_data["yy"]
+    Z = boundary_data["Z"]
+    X_2d = boundary_data["X_2d"]
+    species = boundary_data["species"]
+    title = boundary_data["title"]
+
     cmap_light = ListedColormap(["#FFD1CF", "#D4F0FA", "#D4FADD"])
 
     fig, ax = plt.subplots(figsize=(6.3, 4.0))
@@ -653,7 +742,7 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
     sns.scatterplot(
         x=X_2d[:, 0],
         y=X_2d[:, 1],
-        hue=plot_df["species"],
+        hue=species,
         palette=MORANDI_PALETTE,
         edgecolor="#555555",
         s=42,
@@ -673,105 +762,102 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
 
 
 # =========================
-# 4. 模型函数
+# 5. 模型函数（缓存版）
 # =========================
-def run_knn(iris_data, k=5):
-    X_train, X_test, y_train, y_test = get_train_test_data(iris_data)
-
-    scaler = StandardScaler()
-    X_train_std = scaler.fit_transform(X_train)
-    X_test_std = scaler.transform(X_test)
+@st.cache_data(show_spinner=False)
+def run_knn_cached(iris_data, k=5):
+    prepared = get_prepared_data(iris_data)
 
     model = KNeighborsClassifier(n_neighbors=k)
-    model.fit(X_train_std, y_train)
-    y_pred = model.predict(X_test_std)
+    model.fit(prepared["X_train_std"], prepared["y_train_text"])
+    y_pred = model.predict(prepared["X_test_std"])
 
-    acc = accuracy_score(y_test, y_pred)
-    report_df = pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose()
-    cm = confusion_matrix(y_test, y_pred, labels=SPECIES_ORDER)
+    acc = accuracy_score(prepared["y_test_text"], y_pred)
+    report_df = pd.DataFrame(
+        classification_report(prepared["y_test_text"], y_pred, output_dict=True)
+    ).transpose()
+    cm = confusion_matrix(prepared["y_test_text"], y_pred, labels=SPECIES_ORDER)
 
     return {
         "accuracy": acc,
         "report_df": report_df,
-        "cm_fig": plot_confusion_matrix(cm, SPECIES_ORDER, f"Confusion Matrix of KNN (k={k})"),
+        "cm": cm,
+        "labels": SPECIES_ORDER
+    }
+
+
+def run_knn(iris_data, k=5):
+    result = run_knn_cached(iris_data, k)
+    result["cm_fig"] = plot_confusion_matrix(result["cm"], result["labels"], f"Confusion Matrix of KNN (k={k})")
+    return result
+
+
+@st.cache_data(show_spinner=False)
+def run_svm_cached(iris_data, c_value=1.0):
+    prepared = get_prepared_data(iris_data)
+
+    model = SVC(C=c_value, kernel="rbf", gamma="scale", random_state=42)
+    model.fit(prepared["X_train_std"], prepared["y_train_text"])
+    y_pred = model.predict(prepared["X_test_std"])
+
+    acc = accuracy_score(prepared["y_test_text"], y_pred)
+    report_df = pd.DataFrame(
+        classification_report(prepared["y_test_text"], y_pred, output_dict=True)
+    ).transpose()
+    cm = confusion_matrix(prepared["y_test_text"], y_pred, labels=SPECIES_ORDER)
+
+    return {
+        "accuracy": acc,
+        "report_df": report_df,
         "cm": cm,
         "labels": SPECIES_ORDER
     }
 
 
 def run_svm(iris_data, c_value=1.0):
-    X_train, X_test, y_train, y_test = get_train_test_data(iris_data)
+    result = run_svm_cached(iris_data, c_value)
+    result["cm_fig"] = plot_confusion_matrix(result["cm"], result["labels"], f"Confusion Matrix of SVM (C={c_value})")
+    return result
 
-    scaler = StandardScaler()
-    X_train_std = scaler.fit_transform(X_train)
-    X_test_std = scaler.transform(X_test)
 
-    model = SVC(C=c_value, kernel="rbf", gamma="scale", random_state=42)
-    model.fit(X_train_std, y_train)
-    y_pred = model.predict(X_test_std)
+@st.cache_data(show_spinner=False)
+def run_random_forest_cached(iris_data, n_estimators=200):
+    prepared = get_prepared_data(iris_data)
 
-    acc = accuracy_score(y_test, y_pred)
-    report_df = pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose()
-    cm = confusion_matrix(y_test, y_pred, labels=SPECIES_ORDER)
+    model = RandomForestClassifier(
+        n_estimators=n_estimators,
+        random_state=42,
+        n_jobs=-1
+    )
+    model.fit(prepared["X_train"], prepared["y_train_text"])
+    y_pred = model.predict(prepared["X_test"])
+
+    acc = accuracy_score(prepared["y_test_text"], y_pred)
+    report_df = pd.DataFrame(
+        classification_report(prepared["y_test_text"], y_pred, output_dict=True)
+    ).transpose()
+    cm = confusion_matrix(prepared["y_test_text"], y_pred, labels=SPECIES_ORDER)
 
     return {
         "accuracy": acc,
         "report_df": report_df,
-        "cm_fig": plot_confusion_matrix(cm, SPECIES_ORDER, f"Confusion Matrix of SVM (C={c_value})"),
         "cm": cm,
         "labels": SPECIES_ORDER
     }
 
 
 def run_random_forest(iris_data, n_estimators=200):
-    X = iris_data[FEATURE_COLS]
-    y = iris_data["species"]
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=0.25,
-        random_state=42,
-        stratify=y
-    )
-
-    model = RandomForestClassifier(
-        n_estimators=n_estimators,
-        random_state=42
-    )
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-
-    acc = accuracy_score(y_test, y_pred)
-    report_df = pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose()
-    cm = confusion_matrix(y_test, y_pred, labels=SPECIES_ORDER)
-
-    return {
-        "accuracy": acc,
-        "report_df": report_df,
-        "cm_fig": plot_confusion_matrix(cm, SPECIES_ORDER, f"Confusion Matrix of Random Forest (Trees={n_estimators})"),
-        "cm": cm,
-        "labels": SPECIES_ORDER
-    }
+    result = run_random_forest_cached(iris_data, n_estimators)
+    result["cm_fig"] = plot_confusion_matrix(result["cm"], result["labels"], f"Confusion Matrix of Random Forest (Trees={n_estimators})")
+    return result
 
 
-def run_xgboost(iris_data, n_estimators=80, max_depth=3, learning_rate=0.1):
+@st.cache_data(show_spinner=False)
+def run_xgboost_cached(iris_data, n_estimators=80, max_depth=3, learning_rate=0.1):
     if not XGB_AVAILABLE:
         return {"error": "当前环境未安装 xgboost。请先运行：pip install xgboost"}
 
-    X = iris_data[FEATURE_COLS]
-    y = iris_data["species"]
-
-    label_encoder = LabelEncoder()
-    y_encoded = label_encoder.fit_transform(y)
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y_encoded,
-        test_size=0.25,
-        random_state=42,
-        stratify=y_encoded
-    )
+    prepared = get_prepared_data(iris_data)
 
     model = XGBClassifier(
         n_estimators=n_estimators,
@@ -786,27 +872,32 @@ def run_xgboost(iris_data, n_estimators=80, max_depth=3, learning_rate=0.1):
         n_jobs=1,
         verbosity=0
     )
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+    model.fit(prepared["X_train"], prepared["y_train_encoded"])
+    y_pred = model.predict(prepared["X_test"])
 
-    acc = accuracy_score(y_test, y_pred)
     report_df = pd.DataFrame(
         classification_report(
-            y_test,
+            prepared["y_test_encoded"],
             y_pred,
-            target_names=label_encoder.classes_,
+            target_names=prepared["label_classes"],
             output_dict=True
         )
     ).transpose()
-    cm = confusion_matrix(y_test, y_pred)
+    cm = confusion_matrix(prepared["y_test_encoded"], y_pred)
 
     return {
-        "accuracy": acc,
+        "accuracy": accuracy_score(prepared["y_test_encoded"], y_pred),
         "report_df": report_df,
-        "cm_fig": plot_confusion_matrix(cm, label_encoder.classes_, "Confusion Matrix of XGBoost"),
         "cm": cm,
-        "labels": label_encoder.classes_
+        "labels": prepared["label_classes"]
     }
+
+
+def run_xgboost(iris_data, n_estimators=80, max_depth=3, learning_rate=0.1):
+    result = run_xgboost_cached(iris_data, n_estimators, max_depth, learning_rate)
+    if "error" not in result:
+        result["cm_fig"] = plot_confusion_matrix(result["cm"], result["labels"], "Confusion Matrix of XGBoost")
+    return result
 
 
 def get_objective_cm_text(cm, labels):
@@ -868,7 +959,7 @@ with tab1:
     col3.metric("类别数", summary["classes"])
 
     st.subheader("2. 四特征分布小提琴图")
-    st.pyplot(plot_violin(iris_data), use_container_width=False)
+    show_fig(plot_violin(iris_data), use_container_width=False)
 
     st.success("📊 图表解析：小提琴图展示了四个特征在三类样本中的分布形态。可以直观看出，花瓣长度与花瓣宽度的类别区分度明显高于花萼特征，因此它们通常提供更强的分类信息。")
 
@@ -884,11 +975,11 @@ with tab2:
     col1, col2 = st.columns(2)
 
     with col1:
-        st.pyplot(plot_scatter(iris_data), use_container_width=False)
+        show_fig(plot_scatter(iris_data), use_container_width=False)
         st.success("📊 图表解析：Setosa 在花瓣尺寸上明显更小，与另外两类容易分开；Versicolour 与 Virginica 在边界附近存在一定重叠。")
 
     with col2:
-        st.pyplot(plot_heatmap(iris_data), use_container_width=False)
+        show_fig(plot_heatmap(iris_data), use_container_width=False)
         st.success("📊 图表解析：热力图展示了四个数值特征之间的相关性。花瓣长度与花瓣宽度相关性较强，说明这两个特征对分类非常关键。")
 
     st.divider()
@@ -899,11 +990,11 @@ with tab2:
     st.info("💡 降维分析：主成分分析（PCA）将 4 维特征映射至 3 维空间。可以看出，Setosa 形成了较为独立的聚簇，而 Versicolour 与 Virginica 的边界更接近。")
 
 # =========================
-# Tab 3: 模型基准测试
+# Tab 3: 模型比较
 # =========================
 with tab3:
     st.subheader("1. 四种算法准确率随参数变化曲线")
-    st.pyplot(plot_baseline_accuracy_curves(iris_data), use_container_width=False)
+    show_fig(plot_baseline_accuracy_curves(iris_data), use_container_width=False)
 
     st.info(
         "💡 图表说明：上图分别展示了 KNN、SVM、Random Forest 和 XGBoost 的测试集准确率随关键参数变化的趋势，虚线标出了当前核心代码中采用的最佳参数位置。"
@@ -912,7 +1003,7 @@ with tab3:
     st.divider()
 
     st.subheader("2. 最佳参数模型综合性能热力图")
-    st.pyplot(plot_best_model_heatmap(iris_data), use_container_width=False)
+    show_fig(plot_best_model_heatmap(iris_data), use_container_width=False)
 
     st.info(
         "💡 图表解析：该热力图展示了四种分类算法在最佳参数上的性能对比，其中，KNN 和 SVM 的综合表现最好，两者在四项指标上结果完全一致，说明这两种模型在本实验中的分类能力最强，且整体表现较为稳定。"
@@ -938,10 +1029,10 @@ with tab4:
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
         st.subheader("决策边界图")
-        st.pyplot(plot_decision_boundary(iris_data, "KNN", k=k), use_container_width=False)
+        show_fig(plot_decision_boundary(iris_data, "KNN", k=k), use_container_width=False)
 
         st.subheader("混淆矩阵")
-        st.pyplot(result["cm_fig"], use_container_width=False)
+        show_fig(result["cm_fig"], use_container_width=False)
 
         st.subheader("错判统计")
         st.info(get_objective_cm_text(result["cm"], result["labels"]))
@@ -957,10 +1048,10 @@ with tab4:
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
         st.subheader("决策边界图")
-        st.pyplot(plot_decision_boundary(iris_data, "SVM", c_value=c_value), use_container_width=False)
+        show_fig(plot_decision_boundary(iris_data, "SVM", c_value=c_value), use_container_width=False)
 
         st.subheader("混淆矩阵")
-        st.pyplot(result["cm_fig"], use_container_width=False)
+        show_fig(result["cm_fig"], use_container_width=False)
 
         st.subheader("错判统计")
         st.info(get_objective_cm_text(result["cm"], result["labels"]))
@@ -976,10 +1067,10 @@ with tab4:
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
         st.subheader("决策边界图")
-        st.pyplot(plot_decision_boundary(iris_data, "Random Forest", n_estimators=n_estimators), use_container_width=False)
+        show_fig(plot_decision_boundary(iris_data, "Random Forest", n_estimators=n_estimators), use_container_width=False)
 
         st.subheader("混淆矩阵")
-        st.pyplot(result["cm_fig"], use_container_width=False)
+        show_fig(result["cm_fig"], use_container_width=False)
 
         st.subheader("错判统计")
         st.info(get_objective_cm_text(result["cm"], result["labels"]))
@@ -1006,7 +1097,7 @@ with tab4:
             st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
             st.subheader("决策边界图")
-            st.pyplot(
+            show_fig(
                 plot_decision_boundary(
                     iris_data,
                     "XGBoost",
@@ -1018,7 +1109,7 @@ with tab4:
             )
 
             st.subheader("混淆矩阵")
-            st.pyplot(result["cm_fig"], use_container_width=False)
+            show_fig(result["cm_fig"], use_container_width=False)
 
             st.subheader("错判统计")
             st.info(get_objective_cm_text(result["cm"], result["labels"]))
