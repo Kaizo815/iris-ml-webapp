@@ -24,6 +24,12 @@ from sklearn.metrics import (
     precision_recall_fscore_support
 )
 
+try:
+    from xgboost import XGBClassifier
+    XGB_AVAILABLE = True
+except Exception:
+    XGB_AVAILABLE = False
+
 # =========================
 # 0. 页面基础设置
 # =========================
@@ -78,6 +84,12 @@ plt.rcParams["axes.spines.right"] = False
 
 SPECIES_ORDER = ["Setosa", "Versicolour", "Virginica"]
 FEATURE_COLS = ["sepallength", "sepalwidth", "petallength", "petalwidth"]
+
+# 你的核心代码最后那张热力图对应的最佳参数
+BEST_K = 9
+BEST_C = 10
+BEST_RF_N = 50
+BEST_XGB_N = 10
 
 # =========================
 # 2. 数据准备函数
@@ -296,12 +308,191 @@ def plot_confusion_matrix(cm, labels, title):
 
 
 @st.cache_data
-def get_multi_metrics_df(iris_data):
+def get_baseline_curve_data(iris_data):
     X = iris_data[FEATURE_COLS]
     y = iris_data["species"]
 
-    le = LabelEncoder()
-    y_encoded = le.fit_transform(y)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.25,
+        random_state=42,
+        stratify=y
+    )
+
+    scaler = StandardScaler()
+    X_train_std = scaler.fit_transform(X_train)
+    X_test_std = scaler.transform(X_test)
+
+    # KNN
+    k_values = list(range(1, 21))
+    knn_acc = []
+    for k in k_values:
+        model = KNeighborsClassifier(n_neighbors=k)
+        model.fit(X_train_std, y_train)
+        knn_acc.append(accuracy_score(y_test, model.predict(X_test_std)))
+
+    # SVM
+    c_values = [0.01, 0.1, 1, 10, 100]
+    svm_acc = []
+    for c in c_values:
+        model = SVC(C=c, kernel="rbf", gamma="scale", random_state=42)
+        model.fit(X_train_std, y_train)
+        svm_acc.append(accuracy_score(y_test, model.predict(X_test_std)))
+
+    # Random Forest
+    rf_values = [10, 30, 50, 80, 100, 150, 200, 300]
+    rf_acc = []
+    for n in rf_values:
+        model = RandomForestClassifier(n_estimators=n, random_state=42)
+        model.fit(X_train, y_train)
+        rf_acc.append(accuracy_score(y_test, model.predict(X_test)))
+
+    # XGBoost
+    xgb_values = [10, 30, 50, 80, 100, 150, 200, 300]
+    xgb_acc = None
+    if XGB_AVAILABLE:
+        label_encoder = LabelEncoder()
+        y_encoded = label_encoder.fit_transform(y)
+
+        X_train_xgb, X_test_xgb, y_train_xgb, y_test_xgb = train_test_split(
+            X,
+            y_encoded,
+            test_size=0.25,
+            random_state=42,
+            stratify=y_encoded
+        )
+
+        xgb_acc = []
+        for n in xgb_values:
+            model = XGBClassifier(
+                n_estimators=n,
+                max_depth=3,
+                learning_rate=0.1,
+                subsample=0.9,
+                colsample_bytree=0.9,
+                objective="multi:softmax",
+                num_class=3,
+                eval_metric="mlogloss",
+                random_state=42,
+                n_jobs=1,
+                verbosity=0
+            )
+            model.fit(X_train_xgb, y_train_xgb)
+            xgb_acc.append(accuracy_score(y_test_xgb, model.predict(X_test_xgb)))
+
+    return {
+        "knn": {"params": k_values, "acc": knn_acc, "best_param": BEST_K},
+        "svm": {"params": c_values, "acc": svm_acc, "best_param": BEST_C},
+        "rf": {"params": rf_values, "acc": rf_acc, "best_param": BEST_RF_N},
+        "xgb": {"params": xgb_values, "acc": xgb_acc, "best_param": BEST_XGB_N}
+    }
+
+
+def plot_baseline_accuracy_curves(iris_data):
+    curve_data = get_baseline_curve_data(iris_data)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 8.8))
+    fig.suptitle(
+        "Accuracy Curves of Four Classification Algorithms",
+        fontsize=15,
+        fontweight="bold",
+        y=0.98
+    )
+
+    # KNN
+    ax = axes[0, 0]
+    knn_params = curve_data["knn"]["params"]
+    knn_acc = curve_data["knn"]["acc"]
+    best_k = curve_data["knn"]["best_param"]
+    best_k_idx = knn_params.index(best_k)
+
+    ax.plot(knn_params, knn_acc, marker="o", linewidth=2)
+    ax.axvline(best_k, linestyle="--", color="gray", linewidth=1.2)
+    ax.scatter([best_k], [knn_acc[best_k_idx]], s=55, zorder=3)
+    ax.set_title("KNN", fontweight="bold", fontsize=12)
+    ax.set_xlabel("k", fontsize=10)
+    ax.set_ylabel("Accuracy", fontsize=10)
+    ax.set_xticks(knn_params)
+    ax.tick_params(axis="x", labelsize=8)
+    ax.tick_params(axis="y", labelsize=8)
+    ax.grid(True, linestyle="--", alpha=0.4)
+
+    # SVM
+    ax = axes[0, 1]
+    svm_params = curve_data["svm"]["params"]
+    svm_acc = curve_data["svm"]["acc"]
+    best_c = curve_data["svm"]["best_param"]
+    svm_x = np.arange(len(svm_params))
+    best_c_idx = svm_params.index(best_c)
+
+    ax.plot(svm_x, svm_acc, marker="o", linewidth=2)
+    ax.axvline(best_c_idx, linestyle="--", color="gray", linewidth=1.2)
+    ax.scatter([best_c_idx], [svm_acc[best_c_idx]], s=55, zorder=3)
+    ax.set_title("SVM", fontweight="bold", fontsize=12)
+    ax.set_xlabel("C", fontsize=10)
+    ax.set_ylabel("Accuracy", fontsize=10)
+    ax.set_xticks(svm_x)
+    ax.set_xticklabels(svm_params)
+    ax.tick_params(axis="x", labelsize=8)
+    ax.tick_params(axis="y", labelsize=8)
+    ax.grid(True, linestyle="--", alpha=0.4)
+
+    # Random Forest
+    ax = axes[1, 0]
+    rf_params = curve_data["rf"]["params"]
+    rf_acc = curve_data["rf"]["acc"]
+    best_rf = curve_data["rf"]["best_param"]
+    best_rf_idx = rf_params.index(best_rf)
+
+    ax.plot(rf_params, rf_acc, marker="o", linewidth=2)
+    ax.axvline(best_rf, linestyle="--", color="gray", linewidth=1.2)
+    ax.scatter([best_rf], [rf_acc[best_rf_idx]], s=55, zorder=3)
+    ax.set_title("Random Forest", fontweight="bold", fontsize=12)
+    ax.set_xlabel("n_estimators", fontsize=10)
+    ax.set_ylabel("Accuracy", fontsize=10)
+    ax.tick_params(axis="x", labelsize=8)
+    ax.tick_params(axis="y", labelsize=8)
+    ax.grid(True, linestyle="--", alpha=0.4)
+
+    # XGBoost
+    ax = axes[1, 1]
+    xgb_params = curve_data["xgb"]["params"]
+    xgb_acc = curve_data["xgb"]["acc"]
+    best_xgb = curve_data["xgb"]["best_param"]
+
+    if xgb_acc is None:
+        ax.text(
+            0.5, 0.5,
+            "xgboost is not installed.\nPlease run: pip install xgboost",
+            ha="center", va="center", fontsize=11
+        )
+        ax.set_title("XGBoost", fontweight="bold", fontsize=12)
+        ax.set_xticks([])
+        ax.set_yticks([])
+    else:
+        best_xgb_idx = xgb_params.index(best_xgb)
+        ax.plot(xgb_params, xgb_acc, marker="o", linewidth=2)
+        ax.axvline(best_xgb, linestyle="--", color="gray", linewidth=1.2)
+        ax.scatter([best_xgb], [xgb_acc[best_xgb_idx]], s=55, zorder=3)
+        ax.set_title("XGBoost", fontweight="bold", fontsize=12)
+        ax.set_xlabel("n_estimators", fontsize=10)
+        ax.set_ylabel("Accuracy", fontsize=10)
+        ax.tick_params(axis="x", labelsize=8)
+        ax.tick_params(axis="y", labelsize=8)
+        ax.grid(True, linestyle="--", alpha=0.4)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    return fig
+
+
+@st.cache_data
+def get_best_metrics_df(iris_data):
+    X = iris_data[FEATURE_COLS]
+    y = iris_data["species"]
+
+    label_encoder = LabelEncoder()
+    y_encoded = label_encoder.fit_transform(y)
 
     X_train, X_test, y_train, y_test = train_test_split(
         X,
@@ -316,15 +507,33 @@ def get_multi_metrics_df(iris_data):
     X_test_std = scaler.transform(X_test)
 
     models = {
-        "KNN (k=5)": KNeighborsClassifier(n_neighbors=5),
-        "SVM (C=1.0)": SVC(C=1.0, kernel="rbf", gamma="scale", random_state=42),
-        "Random Forest": RandomForestClassifier(n_estimators=200, random_state=42)
+        f"KNN (k={BEST_K})": KNeighborsClassifier(n_neighbors=BEST_K),
+        f"SVM (C={BEST_C})": SVC(C=BEST_C, kernel="rbf", gamma="scale", random_state=42),
+        f"Random Forest\n(n={BEST_RF_N})": RandomForestClassifier(
+            n_estimators=BEST_RF_N,
+            random_state=42
+        )
     }
+
+    if XGB_AVAILABLE:
+        models[f"XGBoost\n(n={BEST_XGB_N})"] = XGBClassifier(
+            n_estimators=BEST_XGB_N,
+            max_depth=3,
+            learning_rate=0.1,
+            subsample=0.9,
+            colsample_bytree=0.9,
+            objective="multi:softmax",
+            num_class=3,
+            eval_metric="mlogloss",
+            random_state=42,
+            n_jobs=1,
+            verbosity=0
+        )
 
     results = {}
 
     for name, model in models.items():
-        if name in ["KNN (k=5)", "SVM (C=1.0)"]:
+        if "KNN" in name or "SVM" in name:
             curr_X_train = X_train_std
             curr_X_test = X_test_std
         else:
@@ -348,60 +557,33 @@ def get_multi_metrics_df(iris_data):
             "F1-Score": f1
         }
 
-    try:
-        from xgboost import XGBClassifier
-
-        xgb_model = XGBClassifier(
-            n_estimators=80,
-            max_depth=3,
-            learning_rate=0.1,
-            subsample=0.9,
-            colsample_bytree=0.9,
-            objective="multi:softmax",
-            num_class=3,
-            eval_metric="mlogloss",
-            random_state=42
-        )
-        xgb_model.fit(X_train, y_train)
-        y_pred = xgb_model.predict(X_test)
-
-        acc = accuracy_score(y_test, y_pred)
-        precision, recall, f1, _ = precision_recall_fscore_support(
-            y_test,
-            y_pred,
-            average="macro"
-        )
-
-        results["XGBoost"] = {
-            "Accuracy": acc,
-            "Precision": precision,
-            "Recall": recall,
-            "F1-Score": f1
-        }
-
-    except Exception:
-        pass
-
     return pd.DataFrame(results).T
 
 
-def plot_multi_metrics_heatmap(iris_data):
-    metrics_df = get_multi_metrics_df(iris_data)
+def plot_best_model_heatmap(iris_data):
+    metrics_df = get_best_metrics_df(iris_data)
 
-    fig, ax = plt.subplots(figsize=(7.8, 5.7))
+    fig, ax = plt.subplots(figsize=(8.8, 5.6))
     sns.heatmap(
         metrics_df,
         annot=True,
         fmt=".4f",
         cmap="PuBu",
-        linewidths=0.9,
+        linewidths=1,
         linecolor="white",
         cbar=True,
         ax=ax,
         annot_kws={"size": 12, "fontweight": "bold"}
     )
 
-    ax.set_title("Multi-Metric Model Comparison", fontsize=14, fontweight="bold", pad=10)
+    ax.set_title(
+        "Performance Comparison of Best-Parameter Models",
+        fontsize=14,
+        fontweight="bold",
+        pad=12
+    )
+    ax.set_xlabel("")
+    ax.set_ylabel("")
     ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
     ax.tick_params(axis="x", labelsize=10)
     ax.tick_params(axis="y", labelsize=10)
@@ -435,7 +617,6 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
         title = f"2D Decision Boundary of Random Forest (Trees={n_estimators})"
 
     else:
-        from xgboost import XGBClassifier
         model = XGBClassifier(
             n_estimators=n_estimators,
             max_depth=max_depth,
@@ -445,7 +626,9 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
             objective="multi:softmax",
             num_class=3,
             eval_metric="mlogloss",
-            random_state=42
+            random_state=42,
+            n_jobs=1,
+            verbosity=0
         )
         title = "2D Decision Boundary of XGBoost"
 
@@ -454,7 +637,6 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
     x_min, x_max = X_2d[:, 0].min() - 0.5, X_2d[:, 0].max() + 0.5
     y_min, y_max = X_2d[:, 1].min() - 0.5, X_2d[:, 1].max() + 0.5
 
-    # 优化性能：步长调大，减少预测点数量
     xx, yy = np.meshgrid(
         np.arange(x_min, x_max, 0.05),
         np.arange(y_min, y_max, 0.05)
@@ -574,9 +756,7 @@ def run_random_forest(iris_data, n_estimators=200):
 
 
 def run_xgboost(iris_data, n_estimators=80, max_depth=3, learning_rate=0.1):
-    try:
-        from xgboost import XGBClassifier
-    except ImportError:
+    if not XGB_AVAILABLE:
         return {"error": "当前环境未安装 xgboost。请先运行：pip install xgboost"}
 
     X = iris_data[FEATURE_COLS]
@@ -602,7 +782,9 @@ def run_xgboost(iris_data, n_estimators=80, max_depth=3, learning_rate=0.1):
         objective="multi:softmax",
         num_class=3,
         eval_metric="mlogloss",
-        random_state=42
+        random_state=42,
+        n_jobs=1,
+        verbosity=0
     )
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
@@ -663,14 +845,14 @@ with st.expander("📊 系统功能简介", expanded=True):
     本交互式演示系统集成了数据预处理、可视化探索与模型评估的全流程，包含以下核心模块：
     1. **Data Overview (数据概览)**：展示鸢尾花数据集的基础统计信息与分布特征。
     2. **Feature Engineering (特征可视化)**：展示二维散点图、相关性热力图与 3D PCA 降维结果。
-    3. **Model Baseline (模型基准测试)**：从多指标角度综合比较四种经典分类模型。
+    3. **Model Comparison (模型比较)**：展示四种算法的参数-准确率曲线，以及最佳参数模型综合热力图。
     4. **Interactive Demo (交互式演练)**：支持动态调整参数，并实时观察决策边界、混淆矩阵与分类指标变化。
     """)
 
 tab1, tab2, tab3, tab4 = st.tabs([
     "Data Overview",
     "Feature Engineering",
-    "Model Baseline",
+    "Model Comparison",
     "Interactive Demo"
 ])
 
@@ -720,11 +902,20 @@ with tab2:
 # Tab 3: 模型基准测试
 # =========================
 with tab3:
-    st.subheader("多指标模型比较热力图")
-    st.pyplot(plot_multi_metrics_heatmap(iris_data), use_container_width=False)
+    st.subheader("1. 四种算法准确率随参数变化曲线")
+    st.pyplot(plot_baseline_accuracy_curves(iris_data), use_container_width=False)
 
     st.info(
-        "💡 学术解析：该热力图从 Accuracy、Precision、Recall 与 F1-Score 四个维度同时比较了四种模型的基准性能。整体来看，树模型（Random Forest、XGBoost）通常在综合指标上表现更稳定，而距离/空间模型（KNN、SVM）则更依赖特征空间的分布结构。该结果可以作为后续交互式调参与模型分析的基准参考。"
+        "💡 图表说明：上图分别展示了 KNN、SVM、Random Forest 和 XGBoost 的测试集准确率随关键参数变化的趋势，虚线标出了当前核心代码中采用的最佳参数位置。"
+    )
+
+    st.divider()
+
+    st.subheader("2. 最佳参数模型综合性能热力图")
+    st.pyplot(plot_best_model_heatmap(iris_data), use_container_width=False)
+
+    st.info(
+        "💡 学术解析：该热力图与核心代码最后一张图一致，基于最佳参数模型比较 Accuracy、Precision、Recall 与 F1-Score 四项指标，可作为后续交互式调参与模型分析的基准参考。"
     )
 
 # =========================
