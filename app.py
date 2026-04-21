@@ -1,6 +1,8 @@
 import warnings
 warnings.filterwarnings("ignore")
 
+from io import BytesIO
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -99,6 +101,25 @@ BEST_XGB_N = 10
 def show_fig(fig, use_container_width=False):
     st.pyplot(fig, use_container_width=use_container_width)
     plt.close(fig)
+
+
+def fig_to_png_bytes(fig, dpi=150):
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def show_png(png_bytes, use_container_width=False):
+    st.image(png_bytes, use_container_width=use_container_width)
+
+
+def fragment_or_nop(func):
+    fragment_fn = getattr(st, "fragment", None)
+    if fragment_fn is None:
+        return func
+    return fragment_fn(func)
 
 
 # =========================
@@ -364,6 +385,29 @@ def plot_confusion_matrix(cm, labels, title):
     return fig
 
 
+# =========================
+# 4.1 静态图缓存（优化）
+# =========================
+@st.cache_data(show_spinner=False)
+def get_violin_png(iris_data):
+    return fig_to_png_bytes(plot_violin(iris_data))
+
+
+@st.cache_data(show_spinner=False)
+def get_scatter_png(iris_data):
+    return fig_to_png_bytes(plot_scatter(iris_data))
+
+
+@st.cache_data(show_spinner=False)
+def get_heatmap_png(iris_data):
+    return fig_to_png_bytes(plot_heatmap(iris_data))
+
+
+@st.cache_resource(show_spinner=False)
+def get_pca_plotly_fig(iris_data):
+    return plot_pca_3d(iris_data)
+
+
 @st.cache_data(show_spinner=False)
 def get_baseline_curve_data(iris_data):
     prepared = get_prepared_data(iris_data)
@@ -529,6 +573,11 @@ def plot_baseline_accuracy_curves(iris_data):
 
 
 @st.cache_data(show_spinner=False)
+def get_baseline_curves_png(iris_data):
+    return fig_to_png_bytes(plot_baseline_accuracy_curves(iris_data))
+
+
+@st.cache_data(show_spinner=False)
 def get_best_metrics_df(iris_data):
     prepared = get_prepared_data(iris_data)
 
@@ -644,6 +693,44 @@ def plot_best_model_heatmap(iris_data):
 
 
 @st.cache_data(show_spinner=False)
+def get_best_model_heatmap_png(iris_data):
+    return fig_to_png_bytes(plot_best_model_heatmap(iris_data))
+
+
+# =========================
+# 4.2 决策边界缓存（优化）
+# =========================
+@st.cache_data(show_spinner=False)
+def get_decision_boundary_base(iris_data):
+    plot_df = iris_data.copy()
+
+    X_2d = plot_df[["petallength", "petalwidth"]].values
+    y_text = plot_df["species"].values
+
+    label_encoder = LabelEncoder()
+    y = label_encoder.fit_transform(y_text)
+
+    x_min, x_max = X_2d[:, 0].min() - 0.5, X_2d[:, 0].max() + 0.5
+    y_min, y_max = X_2d[:, 1].min() - 0.5, X_2d[:, 1].max() + 0.5
+
+    xx, yy = np.meshgrid(
+        np.arange(x_min, x_max, 0.05),
+        np.arange(y_min, y_max, 0.05)
+    )
+
+    grid_points = np.c_[xx.ravel(), yy.ravel()]
+
+    return {
+        "X_2d": X_2d,
+        "y": y,
+        "species": plot_df["species"].values,
+        "xx": xx,
+        "yy": yy,
+        "grid_points": grid_points
+    }
+
+
+@st.cache_data(show_spinner=False)
 def get_decision_boundary_data(
     iris_data,
     model_name,
@@ -653,13 +740,13 @@ def get_decision_boundary_data(
     max_depth=3,
     learning_rate=0.1
 ):
-    plot_df = iris_data.copy()
+    base = get_decision_boundary_base(iris_data)
 
-    X_2d = plot_df[["petallength", "petalwidth"]].values
-    y_text = plot_df["species"].values
-
-    label_encoder = LabelEncoder()
-    y = label_encoder.fit_transform(y_text)
+    X_2d = base["X_2d"]
+    y = base["y"]
+    xx = base["xx"]
+    yy = base["yy"]
+    grid_points = base["grid_points"]
 
     if model_name == "KNN":
         model = KNeighborsClassifier(n_neighbors=k)
@@ -694,24 +781,14 @@ def get_decision_boundary_data(
         title = "2D Decision Boundary of XGBoost"
 
     model.fit(X_2d, y)
-
-    x_min, x_max = X_2d[:, 0].min() - 0.5, X_2d[:, 0].max() + 0.5
-    y_min, y_max = X_2d[:, 1].min() - 0.5, X_2d[:, 1].max() + 0.5
-
-    xx, yy = np.meshgrid(
-        np.arange(x_min, x_max, 0.05),
-        np.arange(y_min, y_max, 0.05)
-    )
-
-    Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
-    Z = Z.reshape(xx.shape)
+    Z = model.predict(grid_points).reshape(xx.shape)
 
     return {
         "xx": xx,
         "yy": yy,
         "Z": Z,
         "X_2d": X_2d,
-        "species": plot_df["species"].values,
+        "species": base["species"],
         "title": title
     }
 
@@ -761,6 +838,36 @@ def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators
     return fig
 
 
+@st.cache_data(show_spinner=False)
+def get_decision_boundary_png(
+    iris_data,
+    model_name,
+    k=5,
+    c_value=1.0,
+    n_estimators=200,
+    max_depth=3,
+    learning_rate=0.1
+):
+    return fig_to_png_bytes(
+        plot_decision_boundary(
+            iris_data,
+            model_name,
+            k=k,
+            c_value=c_value,
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            learning_rate=learning_rate
+        )
+    )
+
+
+@st.cache_data(show_spinner=False)
+def get_confusion_matrix_png(cm_tuple, labels_tuple, title):
+    cm = np.array(cm_tuple)
+    labels = list(labels_tuple)
+    return fig_to_png_bytes(plot_confusion_matrix(cm, labels, title))
+
+
 # =========================
 # 5. 模型函数（缓存版）
 # =========================
@@ -786,12 +893,6 @@ def run_knn_cached(iris_data, k=5):
     }
 
 
-def run_knn(iris_data, k=5):
-    result = run_knn_cached(iris_data, k)
-    result["cm_fig"] = plot_confusion_matrix(result["cm"], result["labels"], f"Confusion Matrix of KNN (k={k})")
-    return result
-
-
 @st.cache_data(show_spinner=False)
 def run_svm_cached(iris_data, c_value=1.0):
     prepared = get_prepared_data(iris_data)
@@ -812,12 +913,6 @@ def run_svm_cached(iris_data, c_value=1.0):
         "cm": cm,
         "labels": SPECIES_ORDER
     }
-
-
-def run_svm(iris_data, c_value=1.0):
-    result = run_svm_cached(iris_data, c_value)
-    result["cm_fig"] = plot_confusion_matrix(result["cm"], result["labels"], f"Confusion Matrix of SVM (C={c_value})")
-    return result
 
 
 @st.cache_data(show_spinner=False)
@@ -844,12 +939,6 @@ def run_random_forest_cached(iris_data, n_estimators=200):
         "cm": cm,
         "labels": SPECIES_ORDER
     }
-
-
-def run_random_forest(iris_data, n_estimators=200):
-    result = run_random_forest_cached(iris_data, n_estimators)
-    result["cm_fig"] = plot_confusion_matrix(result["cm"], result["labels"], f"Confusion Matrix of Random Forest (Trees={n_estimators})")
-    return result
 
 
 @st.cache_data(show_spinner=False)
@@ -891,13 +980,6 @@ def run_xgboost_cached(iris_data, n_estimators=80, max_depth=3, learning_rate=0.
         "cm": cm,
         "labels": prepared["label_classes"]
     }
-
-
-def run_xgboost(iris_data, n_estimators=80, max_depth=3, learning_rate=0.1):
-    result = run_xgboost_cached(iris_data, n_estimators, max_depth, learning_rate)
-    if "error" not in result:
-        result["cm_fig"] = plot_confusion_matrix(result["cm"], result["labels"], "Confusion Matrix of XGBoost")
-    return result
 
 
 def get_objective_cm_text(cm, labels):
@@ -959,7 +1041,7 @@ with tab1:
     col3.metric("类别数", summary["classes"])
 
     st.subheader("2. 四特征分布小提琴图")
-    show_fig(plot_violin(iris_data), use_container_width=False)
+    show_png(get_violin_png(iris_data), use_container_width=False)
 
     st.success("📊 图表解析：小提琴图展示了四个特征在三类样本中的分布形态。可以直观看出，花瓣长度与花瓣宽度的类别区分度明显高于花萼特征，因此它们通常提供更强的分类信息。")
 
@@ -975,17 +1057,17 @@ with tab2:
     col1, col2 = st.columns(2)
 
     with col1:
-        show_fig(plot_scatter(iris_data), use_container_width=False)
+        show_png(get_scatter_png(iris_data), use_container_width=False)
         st.success("📊 图表解析：Setosa 在花瓣尺寸上明显更小，与另外两类容易分开；Versicolour 与 Virginica 在边界附近存在一定重叠。")
 
     with col2:
-        show_fig(plot_heatmap(iris_data), use_container_width=False)
+        show_png(get_heatmap_png(iris_data), use_container_width=False)
         st.success("📊 图表解析：热力图展示了四个数值特征之间的相关性。花瓣长度与花瓣宽度相关性较强，说明这两个特征对分类非常关键。")
 
     st.divider()
 
     st.subheader("2. 3D PCA 降维展示")
-    st.plotly_chart(plot_pca_3d(iris_data), use_container_width=False)
+    st.plotly_chart(get_pca_plotly_fig(iris_data), use_container_width=False)
 
     st.info("💡 降维分析：主成分分析（PCA）将 4 维特征映射至 3 维空间。可以看出，Setosa 形成了较为独立的聚簇，而 Versicolour 与 Virginica 的边界更接近。")
 
@@ -994,7 +1076,7 @@ with tab2:
 # =========================
 with tab3:
     st.subheader("1. 四种算法准确率随参数变化曲线")
-    show_fig(plot_baseline_accuracy_curves(iris_data), use_container_width=False)
+    show_png(get_baseline_curves_png(iris_data), use_container_width=False)
 
     st.info(
         "💡 图表说明：上图分别展示了 KNN、SVM、Random Forest 和 XGBoost 的测试集准确率随关键参数变化的趋势，虚线标出了当前核心代码中采用的最佳参数位置。"
@@ -1003,7 +1085,7 @@ with tab3:
     st.divider()
 
     st.subheader("2. 最佳参数模型综合性能热力图")
-    show_fig(plot_best_model_heatmap(iris_data), use_container_width=False)
+    show_png(get_best_model_heatmap_png(iris_data), use_container_width=False)
 
     st.info(
         "💡 图表解析：该热力图展示了四种分类算法在最佳参数上的性能对比，其中，KNN 和 SVM 的综合表现最好，两者在四项指标上结果完全一致，说明这两种模型在本实验中的分类能力最强，且整体表现较为稳定。"
@@ -1012,7 +1094,8 @@ with tab3:
 # =========================
 # Tab 4: 交互式演练
 # =========================
-with tab4:
+@fragment_or_nop
+def render_interactive_demo(iris_data):
     st.subheader("交互式演练")
     st.sidebar.header("⚙️ Model Settings")
 
@@ -1024,15 +1107,29 @@ with tab4:
     if model_name == "KNN":
         st.markdown("### K-Nearest Neighbors (KNN) Evaluation")
         k = st.sidebar.slider("Number of Neighbors (k)", min_value=1, max_value=20, value=5, step=1)
-        result = run_knn(iris_data, k=k)
+        result = run_knn_cached(iris_data, k=k)
 
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
         st.subheader("决策边界图")
-        show_fig(plot_decision_boundary(iris_data, "KNN", k=k), use_container_width=False)
+        show_png(
+            get_decision_boundary_png(
+                iris_data,
+                "KNN",
+                k=k
+            ),
+            use_container_width=False
+        )
 
         st.subheader("混淆矩阵")
-        show_fig(result["cm_fig"], use_container_width=False)
+        show_png(
+            get_confusion_matrix_png(
+                tuple(map(tuple, result["cm"].tolist())),
+                tuple(result["labels"]),
+                f"Confusion Matrix of KNN (k={k})"
+            ),
+            use_container_width=False
+        )
 
         st.subheader("错判统计")
         st.info(get_objective_cm_text(result["cm"], result["labels"]))
@@ -1043,15 +1140,29 @@ with tab4:
     elif model_name == "SVM":
         st.markdown("### Support Vector Machine (SVM) Evaluation")
         c_value = st.sidebar.selectbox("Regularization Parameter (C)", [0.01, 0.1, 1, 10, 100], index=2)
-        result = run_svm(iris_data, c_value=c_value)
+        result = run_svm_cached(iris_data, c_value=c_value)
 
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
         st.subheader("决策边界图")
-        show_fig(plot_decision_boundary(iris_data, "SVM", c_value=c_value), use_container_width=False)
+        show_png(
+            get_decision_boundary_png(
+                iris_data,
+                "SVM",
+                c_value=c_value
+            ),
+            use_container_width=False
+        )
 
         st.subheader("混淆矩阵")
-        show_fig(result["cm_fig"], use_container_width=False)
+        show_png(
+            get_confusion_matrix_png(
+                tuple(map(tuple, result["cm"].tolist())),
+                tuple(result["labels"]),
+                f"Confusion Matrix of SVM (C={c_value})"
+            ),
+            use_container_width=False
+        )
 
         st.subheader("错判统计")
         st.info(get_objective_cm_text(result["cm"], result["labels"]))
@@ -1062,15 +1173,29 @@ with tab4:
     elif model_name == "Random Forest":
         st.markdown("### Random Forest Evaluation")
         n_estimators = st.sidebar.slider("Number of Trees", min_value=10, max_value=500, value=200, step=10)
-        result = run_random_forest(iris_data, n_estimators=n_estimators)
+        result = run_random_forest_cached(iris_data, n_estimators=n_estimators)
 
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
         st.subheader("决策边界图")
-        show_fig(plot_decision_boundary(iris_data, "Random Forest", n_estimators=n_estimators), use_container_width=False)
+        show_png(
+            get_decision_boundary_png(
+                iris_data,
+                "Random Forest",
+                n_estimators=n_estimators
+            ),
+            use_container_width=False
+        )
 
         st.subheader("混淆矩阵")
-        show_fig(result["cm_fig"], use_container_width=False)
+        show_png(
+            get_confusion_matrix_png(
+                tuple(map(tuple, result["cm"].tolist())),
+                tuple(result["labels"]),
+                f"Confusion Matrix of Random Forest (Trees={n_estimators})"
+            ),
+            use_container_width=False
+        )
 
         st.subheader("错判统计")
         st.info(get_objective_cm_text(result["cm"], result["labels"]))
@@ -1084,7 +1209,7 @@ with tab4:
         max_depth = st.sidebar.slider("Maximum Tree Depth", min_value=2, max_value=8, value=3, step=1)
         learning_rate = st.sidebar.select_slider("Learning Rate", options=[0.01, 0.05, 0.1, 0.2, 0.3], value=0.1)
 
-        result = run_xgboost(
+        result = run_xgboost_cached(
             iris_data,
             n_estimators=n_estimators,
             max_depth=max_depth,
@@ -1097,8 +1222,8 @@ with tab4:
             st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
             st.subheader("决策边界图")
-            show_fig(
-                plot_decision_boundary(
+            show_png(
+                get_decision_boundary_png(
                     iris_data,
                     "XGBoost",
                     n_estimators=n_estimators,
@@ -1109,13 +1234,24 @@ with tab4:
             )
 
             st.subheader("混淆矩阵")
-            show_fig(result["cm_fig"], use_container_width=False)
+            show_png(
+                get_confusion_matrix_png(
+                    tuple(map(tuple, result["cm"].tolist())),
+                    tuple(result["labels"]),
+                    "Confusion Matrix of XGBoost"
+                ),
+                use_container_width=False
+            )
 
             st.subheader("错判统计")
             st.info(get_objective_cm_text(result["cm"], result["labels"]))
 
             st.subheader("分类指标报告")
             st.dataframe(result["report_df"], use_container_width=True, height=260)
+
+
+with tab4:
+    render_interactive_demo(iris_data)
 
 st.sidebar.markdown("---")
 st.sidebar.info("👨‍💻 操作提示：请在上方下拉菜单中选择分类算法，并通过拖拽滑块实时调整模型超参数以观察分类效果。")
