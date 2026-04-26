@@ -94,6 +94,10 @@ BEST_C = 10
 BEST_RF_N = 50
 BEST_XGB_N = 10
 
+# XGBoost 固定参数
+FIXED_XGB_MAX_DEPTH = 3
+FIXED_XGB_LEARNING_RATE = 0.1
+
 
 # =========================
 # 2. 通用工具
@@ -113,13 +117,6 @@ def fig_to_png_bytes(fig, dpi=150):
 
 def show_png(png_bytes, use_container_width=False):
     st.image(png_bytes, use_container_width=use_container_width)
-
-
-def fragment_or_nop(func):
-    fragment_fn = getattr(st, "fragment", None)
-    if fragment_fn is None:
-        return func
-    return fragment_fn(func)
 
 
 # =========================
@@ -194,16 +191,6 @@ def get_prepared_data(iris_data):
         "X_train_std": X_train_std,
         "X_test_std": X_test_std
     }
-
-
-def get_train_test_data(iris_data):
-    prepared = get_prepared_data(iris_data)
-    return (
-        prepared["X_train"],
-        prepared["X_test"],
-        prepared["y_train_text"],
-        prepared["y_test_text"]
-    )
 
 
 @st.cache_data(show_spinner=False)
@@ -386,7 +373,7 @@ def plot_confusion_matrix(cm, labels, title):
 
 
 # =========================
-# 4.1 静态图缓存（优化）
+# 4.1 静态图缓存
 # =========================
 @st.cache_data(show_spinner=False)
 def get_violin_png(iris_data):
@@ -445,7 +432,7 @@ def get_baseline_curve_data(iris_data):
         model.fit(X_train, y_train_text)
         rf_acc.append(accuracy_score(y_test_text, model.predict(X_test)))
 
-    # XGBoost
+    # XGBoost（仅调整 n_estimators，其余参数固定）
     xgb_values = [10, 30, 50, 80, 100, 150, 200, 300]
     xgb_acc = None
     if XGB_AVAILABLE:
@@ -453,8 +440,8 @@ def get_baseline_curve_data(iris_data):
         for n in xgb_values:
             model = XGBClassifier(
                 n_estimators=n,
-                max_depth=3,
-                learning_rate=0.1,
+                max_depth=FIXED_XGB_MAX_DEPTH,
+                learning_rate=FIXED_XGB_LEARNING_RATE,
                 subsample=0.9,
                 colsample_bytree=0.9,
                 objective="multi:softmax",
@@ -634,8 +621,8 @@ def get_best_metrics_df(iris_data):
     if XGB_AVAILABLE:
         xgb_model = XGBClassifier(
             n_estimators=BEST_XGB_N,
-            max_depth=3,
-            learning_rate=0.1,
+            max_depth=FIXED_XGB_MAX_DEPTH,
+            learning_rate=FIXED_XGB_LEARNING_RATE,
             subsample=0.9,
             colsample_bytree=0.9,
             objective="multi:softmax",
@@ -698,7 +685,7 @@ def get_best_model_heatmap_png(iris_data):
 
 
 # =========================
-# 4.2 决策边界缓存（优化）
+# 4.2 决策边界缓存
 # =========================
 @st.cache_data(show_spinner=False)
 def get_decision_boundary_base(iris_data):
@@ -767,8 +754,8 @@ def get_decision_boundary_data(
     else:
         model = XGBClassifier(
             n_estimators=n_estimators,
-            max_depth=max_depth,
-            learning_rate=learning_rate,
+            max_depth=FIXED_XGB_MAX_DEPTH,
+            learning_rate=FIXED_XGB_LEARNING_RATE,
             subsample=0.9,
             colsample_bytree=0.9,
             objective="multi:softmax",
@@ -778,7 +765,7 @@ def get_decision_boundary_data(
             n_jobs=1,
             verbosity=0
         )
-        title = "2D Decision Boundary of XGBoost"
+        title = f"2D Decision Boundary of XGBoost (max_depth={FIXED_XGB_MAX_DEPTH}, lr={FIXED_XGB_LEARNING_RATE})"
 
     model.fit(X_2d, y)
     Z = model.predict(grid_points).reshape(xx.shape)
@@ -942,7 +929,7 @@ def run_random_forest_cached(iris_data, n_estimators=200):
 
 
 @st.cache_data(show_spinner=False)
-def run_xgboost_cached(iris_data, n_estimators=80, max_depth=3, learning_rate=0.1):
+def run_xgboost_cached(iris_data, n_estimators=BEST_XGB_N):
     if not XGB_AVAILABLE:
         return {"error": "当前环境未安装 xgboost。请先运行：pip install xgboost"}
 
@@ -950,8 +937,8 @@ def run_xgboost_cached(iris_data, n_estimators=80, max_depth=3, learning_rate=0.
 
     model = XGBClassifier(
         n_estimators=n_estimators,
-        max_depth=max_depth,
-        learning_rate=learning_rate,
+        max_depth=FIXED_XGB_MAX_DEPTH,
+        learning_rate=FIXED_XGB_LEARNING_RATE,
         subsample=0.9,
         colsample_bytree=0.9,
         objective="multi:softmax",
@@ -1014,11 +1001,11 @@ st.title("🌸 Iris Classification Web System")
 st.caption("Python Course Project | Data Visualization + Classical ML + Interactive Demo")
 
 with st.expander("📊 系统功能简介", expanded=True):
-    st.markdown("""
+    st.markdown(f"""
     本交互式演示系统集成了数据预处理、可视化探索与模型评估的全流程，包含以下核心模块：
     1. **Data Overview (数据概览)**：展示鸢尾花数据集的基础统计信息与分布特征。
     2. **Feature Engineering (特征可视化)**：展示二维散点图、相关性热力图与 3D PCA 降维结果。
-    3. **Model Comparison (模型比较)**：展示四种算法的参数-准确率曲线，以及最佳参数模型综合热力图。
+    3. **Model Comparison (模型比较)**：展示四种算法的参数-准确率曲线，以及最佳参数模型综合热力图。其中 XGBoost 部分仅调整 `n_estimators`，其余参数固定为 `max_depth={FIXED_XGB_MAX_DEPTH}`、`learning_rate={FIXED_XGB_LEARNING_RATE}`。
     4. **Interactive Demo (交互式演练)**：支持动态调整参数，并实时观察决策边界、混淆矩阵与分类指标变化。
     """)
 
@@ -1030,7 +1017,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 # =========================
-# Tab 1: 数据概览
+# Tab 1
 # =========================
 with tab1:
     st.subheader("1. 数据概览")
@@ -1049,7 +1036,7 @@ with tab1:
     st.dataframe(iris_data, use_container_width=True, height=280)
 
 # =========================
-# Tab 2: 特征可视化
+# Tab 2
 # =========================
 with tab2:
     st.subheader("1. 基础特征可视化")
@@ -1072,14 +1059,15 @@ with tab2:
     st.info("💡 降维分析：主成分分析（PCA）将 4 维特征映射至 3 维空间。可以看出，Setosa 形成了较为独立的聚簇，而 Versicolour 与 Virginica 的边界更接近。")
 
 # =========================
-# Tab 3: 模型比较
+# Tab 3
 # =========================
 with tab3:
     st.subheader("1. 四种算法准确率随参数变化曲线")
     show_png(get_baseline_curves_png(iris_data), use_container_width=False)
 
     st.info(
-        "💡 图表说明：上图分别展示了 KNN、SVM、Random Forest 和 XGBoost 的测试集准确率随关键参数变化的趋势，虚线标出了当前核心代码中采用的最佳参数位置。"
+        f"💡 图表说明：上图分别展示了 KNN、SVM、Random Forest 和 XGBoost 的测试集准确率随关键参数变化的趋势，虚线标出了当前核心代码中采用的最佳参数位置。"
+        f"其中，XGBoost 部分采用控制变量法，仅调整 n_estimators，其他参数固定为 max_depth={FIXED_XGB_MAX_DEPTH}、learning_rate={FIXED_XGB_LEARNING_RATE}。"
     )
 
     st.divider()
@@ -1092,7 +1080,7 @@ with tab3:
     )
 
 # =========================
-# Tab 4: 交互式演练
+# Tab 4
 # =========================
 def render_interactive_demo(iris_data):
     st.subheader("交互式演练")
@@ -1111,14 +1099,7 @@ def render_interactive_demo(iris_data):
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
         st.subheader("决策边界图")
-        show_png(
-            get_decision_boundary_png(
-                iris_data,
-                "KNN",
-                k=k
-            ),
-            use_container_width=False
-        )
+        show_png(get_decision_boundary_png(iris_data, "KNN", k=k), use_container_width=False)
 
         st.subheader("混淆矩阵")
         show_png(
@@ -1144,14 +1125,7 @@ def render_interactive_demo(iris_data):
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
         st.subheader("决策边界图")
-        show_png(
-            get_decision_boundary_png(
-                iris_data,
-                "SVM",
-                c_value=c_value
-            ),
-            use_container_width=False
-        )
+        show_png(get_decision_boundary_png(iris_data, "SVM", c_value=c_value), use_container_width=False)
 
         st.subheader("混淆矩阵")
         show_png(
@@ -1177,14 +1151,7 @@ def render_interactive_demo(iris_data):
         st.metric("Test Set Accuracy", f"{result['accuracy']:.4f}")
 
         st.subheader("决策边界图")
-        show_png(
-            get_decision_boundary_png(
-                iris_data,
-                "Random Forest",
-                n_estimators=n_estimators
-            ),
-            use_container_width=False
-        )
+        show_png(get_decision_boundary_png(iris_data, "Random Forest", n_estimators=n_estimators), use_container_width=False)
 
         st.subheader("混淆矩阵")
         show_png(
@@ -1204,16 +1171,19 @@ def render_interactive_demo(iris_data):
 
     else:
         st.markdown("### XGBoost Evaluation")
-        n_estimators = st.sidebar.slider("Number of Boosting Rounds", min_value=50, max_value=300, value=80, step=10)
-        max_depth = st.sidebar.slider("Maximum Tree Depth", min_value=2, max_value=8, value=3, step=1)
-        learning_rate = st.sidebar.select_slider("Learning Rate", options=[0.01, 0.05, 0.1, 0.2, 0.3], value=0.1)
-
-        result = run_xgboost_cached(
-            iris_data,
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            learning_rate=learning_rate
+        n_estimators = st.sidebar.slider(
+            "Number of Boosting Rounds",
+            min_value=10,
+            max_value=300,
+            value=BEST_XGB_N,
+            step=10
         )
+
+        st.info(
+            f"说明：本实验在 XGBoost 部分仅调整 n_estimators，其余参数固定为 max_depth={FIXED_XGB_MAX_DEPTH}，learning_rate={FIXED_XGB_LEARNING_RATE}。"
+        )
+
+        result = run_xgboost_cached(iris_data, n_estimators=n_estimators)
 
         if "error" in result:
             st.error(result["error"])
@@ -1225,9 +1195,7 @@ def render_interactive_demo(iris_data):
                 get_decision_boundary_png(
                     iris_data,
                     "XGBoost",
-                    n_estimators=n_estimators,
-                    max_depth=max_depth,
-                    learning_rate=learning_rate
+                    n_estimators=n_estimators
                 ),
                 use_container_width=False
             )
