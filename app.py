@@ -92,7 +92,7 @@ FEATURE_COLS = ["sepallength", "sepalwidth", "petallength", "petalwidth"]
 BEST_K = 9
 BEST_C = 10
 BEST_RF_N = 50
-BEST_XGB_N = 10
+BEST_XGB_N = 40
 
 # XGBoost 固定参数
 FIXED_XGB_MAX_DEPTH = 3
