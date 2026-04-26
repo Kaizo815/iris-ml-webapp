@@ -102,11 +102,6 @@ FIXED_XGB_LEARNING_RATE = 0.1
 # =========================
 # 2. 通用工具
 # =========================
-def show_fig(fig, use_container_width=False):
-    st.pyplot(fig, use_container_width=use_container_width)
-    plt.close(fig)
-
-
 def fig_to_png_bytes(fig, dpi=150):
     buf = BytesIO()
     fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
@@ -433,7 +428,7 @@ def get_baseline_curve_data(iris_data):
         rf_acc.append(accuracy_score(y_test_text, model.predict(X_test)))
 
     # XGBoost（仅调整 n_estimators，其余参数固定）
-    xgb_values = [10, 30, 50, 80, 100, 150, 200, 300]
+    xgb_values = [10, 20, 30, 40, 50, 80, 100, 150, 200, 300]
     xgb_acc = None
     if XGB_AVAILABLE:
         xgb_acc = []
@@ -724,8 +719,6 @@ def get_decision_boundary_data(
     k=5,
     c_value=1.0,
     n_estimators=200,
-    max_depth=3,
-    learning_rate=0.1
 ):
     base = get_decision_boundary_base(iris_data)
 
@@ -780,15 +773,13 @@ def get_decision_boundary_data(
     }
 
 
-def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators=200, max_depth=3, learning_rate=0.1):
+def plot_decision_boundary(iris_data, model_name, k=5, c_value=1.0, n_estimators=200):
     boundary_data = get_decision_boundary_data(
         iris_data,
         model_name,
         k=k,
         c_value=c_value,
         n_estimators=n_estimators,
-        max_depth=max_depth,
-        learning_rate=learning_rate
     )
 
     xx = boundary_data["xx"]
@@ -832,8 +823,6 @@ def get_decision_boundary_png(
     k=5,
     c_value=1.0,
     n_estimators=200,
-    max_depth=3,
-    learning_rate=0.1
 ):
     return fig_to_png_bytes(
         plot_decision_boundary(
@@ -842,8 +831,6 @@ def get_decision_boundary_png(
             k=k,
             c_value=c_value,
             n_estimators=n_estimators,
-            max_depth=max_depth,
-            learning_rate=learning_rate
         )
     )
 
